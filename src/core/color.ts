@@ -52,12 +52,11 @@ export function severityColor(s: number): string {
   const clamped = Math.max(0, Math.min(1, s));
   let h: number;
   if (clamped <= 0.5) {
-    // 130 -> 60 over [0, 0.5] : h = 130 - 70 * (s/0.5) ??? Actually linear: 130 - (130-60)*(s/0.5) = 130 - 140*s
-    // But spec says 130 at s=0, 60 at s=0.5
-    h = 130 - 140 * clamped; // at 0 ->130, at 0.5 ->60
+    // 130 at s=0 -> 60 at s=0.5
+    h = 130 - 140 * clamped;
   } else {
-    // 60 -> 0 over [0.5, 1]
-    h = 60 - 120 * (clamped - 0.5); // at 0.5 ->60, at 1 ->0
+    // 60 at s=0.5 -> 0 at s=1
+    h = 60 - 120 * (clamped - 0.5);
   }
   // Rounding: use Math.round to get integers
   const hInt = Math.round(h);

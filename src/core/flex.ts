@@ -72,8 +72,11 @@ export function flexTiers(registry: ModelsRegistry | null, boardSlugs: Set<strin
   for (const m of Object.values(registry.models)) {
     if (!m.slug.endsWith("-flex")) continue;
     if (boardSlugs.has(m.slug)) continue;
+    // Both fields are rendered in the row description — require them up front
     const input = m.cost?.input;
+    const output = m.cost?.output;
     if (typeof input !== "number" || !Number.isFinite(input)) continue;
+    if (typeof output !== "number" || !Number.isFinite(output)) continue;
     out.push(m);
   }
   out.sort((a, b) => (a.cost.input - b.cost.input));
@@ -88,13 +91,13 @@ export function formatFlexDescription(m: RegistryModel): string {
 
 function formatPrice(n: number): string {
   // Spec shows 4 -> "$4.00", so always 2 decimals
+  if (!Number.isFinite(n)) return "-";
   return n.toFixed(2);
 }
 
 export function formatContextTokens(context: number | null): string {
   if (context == null || !Number.isFinite(context)) return "-";
   if (context >= 1_000_000) {
-    // 1048560 -> "1.0M" ; 262128 -> 262k path not taken
     return `${(context / 1_000_000).toFixed(1)}M`;
   }
   if (context >= 1000) {
