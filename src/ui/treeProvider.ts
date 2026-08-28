@@ -1,9 +1,24 @@
 import * as vscode from "vscode";
 import type { Snapshot, ValuedQuote, SortOrder } from "../core/types";
 import { costPer1kUsd } from "../core/energy";
+import { computeSeverityScale, basisToSvgUri, severityOf } from "../core/color";
+import type { SeverityScale } from "../core/color";
+import type { RegistryModel } from "../core/flex";
+import { formatFlexDescription, formatContextTokens } from "../core/flex";
+
+export class FlexSectionItem extends vscode.TreeItem {
+  constructor(public readonly flexModels: RegistryModel[]) {
+    super("Flex tiers — registry pricing, no live energy data", vscode.TreeItemCollapsibleState.Expanded);
+    this.contextValue = "flex.header";
+    this.description = `${flexModels.length} variants`;
+    // grey zap icon for the header (same grey as null-basis)
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path fill="#808080" d="M9.5 1 3.5 9.2h3.4L6 15l6.5-8.2H9.1L9.5 1z"/></svg>`;
+    this.iconPath = vscode.Uri.parse("data:image/svg+xml;utf8," + encodeURIComponent(svg));
+  }
+}
 
 export class BoardTreeProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
-  private _onDidChange = new vscode.EventEmitter<void>();
+  private _onDidChange = new vscode.EventEmitter<vscode.TreeItem | undefined>();
   readonly onDidChangeTreeData = this._onDidChange.event;
 
   private valued: ValuedQuote[] = [];
@@ -12,6 +27,11 @@ export class BoardTreeProvider implements vscode.TreeDataProvider<vscode.TreeIte
   private tariff: number = 10;
   private sortOrder: SortOrder = "energy";
   private statusMessage: string | null = null;
+  private colorScaleEnabled = true;
+  private flexEnabled = true;
+  private scale: SeverityScale = { lnMin: 0, lnMax: 0, count: 0 };
+  private flexTiers: RegistryModel[] = [];
+  private registrySource = "";
 
   constructor(private readonly context: vscode.ExtensionContext) {
     const saved = context.workspaceState.get<SortOrder>("sortOrder");
@@ -19,25 +39,46 @@ export class BoardTreeProvider implements vscode.TreeDataProvider<vscode.TreeIte
   }
 
   refresh(): void {
-    this._onDidChange.fire();
+    this._onDidChange.fire(undefined);
   }
 
   setMessage(msg: string | null): void {
     this.statusMessage = msg;
   }
 
-  setData(snapshot: Snapshot | null, valued: ValuedQuote[], bestSlug: string | null, tariff: number): void {
+  setData(
+    snapshot: Snapshot | null,
+    valued: ValuedQuote[],
+    bestSlug: string | null,
+    tariff: number,
+    flexTiers: RegistryModel[] = [],
+    registrySource = "",
+  ): void {
     this.snapshot = snapshot;
     this.valued = valued;
     this.bestSlug = bestSlug;
     this.tariff = tariff;
-    this._onDidChange.fire();
+    this.flexTiers = flexTiers;
+    this.registrySource = registrySource;
+    // compute severity scale once per render
+    const bases = valued.map((v) => v.basisMwh);
+    this.scale = computeSeverityScale(bases);
+    // colorScale flag read lazily in toTreeItem; but we also keep a cached value from config
+    // Controller will call with updated flags via setFlags or we read VS Code config here
+    try {
+      const cfg = vscode.workspace.getConfiguration("neuraldash");
+      this.colorScaleEnabled = cfg.get<boolean>("colorScale", true);
+      this.flexEnabled = cfg.get<boolean>("showFlexTiers", true);
+    } catch {
+      // ignore in tests
+    }
+    this._onDidChange.fire(undefined);
   }
 
   setSortOrder(order: SortOrder): void {
     this.sortOrder = order;
     void this.context.workspaceState.update("sortOrder", order);
-    this._onDidChange.fire();
+    this._onDidChange.fire(undefined);
   }
 
   getSortOrder(): SortOrder {
@@ -48,14 +89,54 @@ export class BoardTreeProvider implements vscode.TreeDataProvider<vscode.TreeIte
     return element;
   }
 
-  async getChildren(): Promise<vscode.TreeItem[]> {
+  async getChildren(element?: vscode.TreeItem): Promise<vscode.TreeItem[]> {
+    // Flex header children
+    if (element instanceof FlexSectionItem) {
+      return element.flexModels.map((m) => this.toFlexItem(m));
+    }
+
     if (!this.snapshot || this.valued.length === 0) {
       const item = new vscode.TreeItem(this.statusMessage ?? "No data yet — refresh to load.", vscode.TreeItemCollapsibleState.None);
       item.description = this.snapshot ? `${this.snapshot.quotes.length} models` : undefined;
       return [item];
     }
     const sorted = this.applySort(this.valued);
-    return sorted.map((v) => this.toTreeItem(v));
+    const rows: vscode.TreeItem[] = sorted.map((v) => this.toTreeItem(v));
+
+    // Append flex collapsible section when enabled and registry has tiers
+    if (this.flexEnabled && this.flexTiers.length > 0) {
+      rows.push(new FlexSectionItem(this.flexTiers));
+    }
+    return rows;
+  }
+
+  private toFlexItem(m: RegistryModel): vscode.TreeItem {
+    const label = m.name || m.slug;
+    const item = new vscode.TreeItem(label, vscode.TreeItemCollapsibleState.None);
+    item.description = formatFlexDescription(m);
+    item.contextValue = "flex.model";
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path fill="#808080" d="M9.5 1 3.5 9.2h3.4L6 15l6.5-8.2H9.1L9.5 1z"/></svg>`;
+    item.iconPath = vscode.Uri.parse("data:image/svg+xml;utf8," + encodeURIComponent(svg));
+
+    const md = new vscode.MarkdownString(undefined, true);
+    const lines: string[] = [];
+    lines.push(`**${escapeMarkdown(m.name)}**  \n\`slug: ${escapeMarkdown(m.slug)}\``);
+    lines.push("");
+    lines.push(`| Field | Value |`);
+    lines.push(`|---|---|`);
+    lines.push(`| Provider | ${escapeMarkdown(m.provider)} |`);
+    lines.push(`| Family | ${escapeMarkdown(m.family ?? "-")} |`);
+    lines.push(`| Context | ${escapeMarkdown(formatContextTokens(m.context))} tokens |`);
+    lines.push(`| Input | $${escapeMarkdown(m.cost.input.toFixed(2))} /1M tok |`);
+    lines.push(`| Output | $${escapeMarkdown(m.cost.output.toFixed(2))} /1M tok |`);
+    if (m.cost.cache_read != null) lines.push(`| Cache read | $${escapeMarkdown(m.cost.cache_read.toFixed(3))} |`);
+    if (m.description) lines.push(`| Description | ${escapeMarkdown(m.description)} |`);
+    if (m.last_updated) lines.push(`| Last updated | ${escapeMarkdown(m.last_updated)} |`);
+    lines.push(`| Source | ${escapeMarkdown(this.registrySource)} |`);
+    lines.push(`\n_Pricing from registry — no live energy data_`);
+    md.value = lines.join("\n");
+    item.tooltip = md;
+    return item;
   }
 
   private applySort(list: ValuedQuote[]): ValuedQuote[] {
@@ -107,13 +188,18 @@ export class BoardTreeProvider implements vscode.TreeDataProvider<vscode.TreeIte
       item.description = "-";
     }
 
-    item.iconPath = new vscode.ThemeIcon(isBest ? "star-full" : "zap");
+    if (isBest) {
+      item.iconPath = new vscode.ThemeIcon("star-full");
+    } else if (this.colorScaleEnabled) {
+      const svg = basisToSvgUri(v.basisMwh, this.scale);
+      item.iconPath = vscode.Uri.parse("data:image/svg+xml;utf8," + encodeURIComponent(svg));
+    } else {
+      item.iconPath = new vscode.ThemeIcon("zap");
+    }
     item.contextValue = isBest ? "model.best" : v.quote.isPreview ? "model.preview" : "model";
 
-    // Tooltip: do NOT set isTrusted — external strings (displayName/slug/contextBand/score.source)
-    // could contain markdown command links. Use appendText() for external values so they are escaped.
+    // Tooltip: do NOT set isTrusted — external strings could contain markdown command links.
     const md = new vscode.MarkdownString(undefined, true);
-    // Build markdown safely: static structure via value, external strings via appendText
     const headerBase = `**${escapeMarkdown(v.quote.displayName)}**  \n\`slug: ${escapeMarkdown(v.quote.slug)}\``;
     const lines: string[] = [];
     lines.push(headerBase);
@@ -134,11 +220,9 @@ export class BoardTreeProvider implements vscode.TreeDataProvider<vscode.TreeIte
     }
     if (v.quote.cachePct != null) lines.push(`| Cache | ${v.quote.cachePct}% |`);
     if (v.quote.contextBand) {
-      // contextBand is external but from scraped HTML — escape it
       lines.push(`| Context | ${escapeMarkdown(v.quote.contextBand)} |`);
     }
     if (v.score) {
-      // score.source is external / user-provided — escape
       lines.push(`| Score | ${v.score.performanceScore} (${escapeMarkdown(v.score.source)}) |`);
     }
     if (v.value != null) lines.push(`| Value | ${v.value.toFixed(4)} (score/mWh) |`);
@@ -164,8 +248,5 @@ export class BoardTreeProvider implements vscode.TreeDataProvider<vscode.TreeIte
 }
 
 function escapeMarkdown(text: string): string {
-  // Escape markdown special chars that could form links/commands when md is rendered.
-  // Minimal: escape backticks, brackets, parens that could form [text](url) or command: links.
-  // Also escape backslashes first.
   return text.replace(/\\/g, "\\\\").replace(/`/g, "\\`").replace(/\[/g, "\\[").replace(/\]/g, "\\]").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
 }

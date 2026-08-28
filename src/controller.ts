@@ -5,6 +5,8 @@ import { BoardTreeProvider } from "./ui/treeProvider";
 import { StatusBarController } from "./ui/statusBar";
 import { rankQuotes, bestValueSlug } from "./core/ranking";
 import { mergedScores, resolveBundledScoresPath } from "./core/scores";
+import { loadModelsRegistry, flexTiers, resolveBundledRegistryPath } from "./core/flex";
+import type { RegistryModel } from "./core/flex";
 import { NEURALWATT_URL } from "./providers/neuralwattProvider";
 
 export class Controller {
@@ -12,6 +14,8 @@ export class Controller {
   private backoffMin = 20;
   private pollMin = 20;
   private isFetching = false;
+  private registryCache: import("./core/flex").ModelsRegistry | null = null;
+  private registrySource = "";
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -25,6 +29,11 @@ export class Controller {
 
   async activate(): Promise<void> {
     this.pollMin = this.readPollInterval();
+
+    // Load registry once
+    const registryPath = resolveBundledRegistryPath(this.extensionRoot);
+    this.registryCache = loadModelsRegistry(registryPath);
+    this.registrySource = this.registryCache?.source ?? "";
 
     // stale-first render
     const cached = await this.cache.load();
@@ -52,7 +61,9 @@ export class Controller {
         if (
           e.affectsConfiguration("neuraldash.tariffPerKWh") ||
           e.affectsConfiguration("neuraldash.preferredBand") ||
-          e.affectsConfiguration("neuraldash.scoresOverridePath")
+          e.affectsConfiguration("neuraldash.scoresOverridePath") ||
+          e.affectsConfiguration("neuraldash.colorScale") ||
+          e.affectsConfiguration("neuraldash.showFlexTiers")
         ) {
           // re-render from cached snapshot
           void this.rerenderFromCache();
@@ -90,7 +101,14 @@ export class Controller {
     const table = mergedScores(bundledPath, overridePath);
     const valued = rankQuotes(snapshot.quotes, table, tariff, preferred);
     const best = bestValueSlug(valued);
-    this.tree.setData(snapshot, valued, best, tariff);
+
+    // Flex tiers per render: board slugs set
+    const showFlex = vscode.workspace.getConfiguration("neuraldash").get<boolean>("showFlexTiers", true);
+    const flexList: RegistryModel[] = showFlex
+      ? flexTiers(this.registryCache, new Set(snapshot.quotes.map((q) => q.slug)))
+      : [];
+
+    this.tree.setData(snapshot, valued, best, tariff, flexList, this.registrySource);
     const myModel = vscode.workspace.getConfiguration("neuraldash").get<string>("myModel", "");
     this.statusBar.update(myModel, valued);
   }

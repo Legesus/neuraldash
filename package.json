@@ -3,7 +3,7 @@
   "displayName": "NeuralDash — Energy Board",
   "description": "Live NeuralWatt energy-per-request board with value ranking and status bar.",
   "publisher": "adamd",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -133,6 +133,16 @@
           "type": "string",
           "default": "",
           "description": "Absolute path to a JSON file overriding data/scores.json (user-wins per slug)."
+        },
+        "neuraldash.colorScale": {
+          "type": "boolean",
+          "default": true,
+          "description": "Colorize board row icons with green->yellow->red severity scale (cheap=green, expensive=red)."
+        },
+        "neuraldash.showFlexTiers": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show Flex tiers section (registry pricing for -flex variants not on the live board)."
         }
       }
     }

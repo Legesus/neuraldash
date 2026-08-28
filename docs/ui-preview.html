@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NeuralDash — UI Preview</title>
+<style>
+  :root{
+    --titlebar:#181818; --activity:#181818; --sidebar:#181818; --editor:#1f1f1f;
+    --statusbar:#181818; --text:#cccccc; --muted:rgba(204,204,204,.55); --faint:rgba(204,204,204,.35);
+    --hover:#2a2d2e; --border:#2b2b2b; --accent:#0078d4; --hovercard:#252526; --hoverborder:#454545;
+    --kws:#569cd6; --str:#ce9178; --com:#6a9955; --fn:#dcdcaa; --num:#b5cea8; --type:#4ec9b0;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#0d0d0d;font-family:"Segoe WPC","Segoe UI",system-ui,sans-serif;color:#d4d4d4;padding:32px 16px 64px}
+  h1{font-size:18px;font-weight:600;margin:0 0 4px;color:#e8e8e8}
+  .sub{color:#9a9a9a;font-size:13px;margin-bottom:28px}
+  .sub b{color:#c8c8c8;font-weight:600}
+  .caption{font-size:13px;color:#9a9a9a;margin:10px 4px 40px;max-width:1176px}
+  .caption code{background:#1b1b1b;border:1px solid #333;border-radius:3px;padding:0 5px;font-family:Consolas,monospace;font-size:12px;color:#c8c8c8}
+
+  .window{width:1200px;margin:0 auto;border:1px solid #3c3c3c;border-radius:8px;overflow:hidden;box-shadow:0 18px 50px rgba(0,0,0,.55);position:relative}
+  .titlebar{height:35px;background:var(--titlebar);display:flex;align-items:center;padding:0 12px;border-bottom:1px solid var(--border)}
+  .wincontrols{margin-left:auto;display:flex;gap:18px;color:#cccccc}
+  .wincontrols span{font-size:10px;opacity:.8}
+  .menubar{display:flex;gap:16px;font-size:12px;color:#cccccc;margin-left:8px}
+  .titlecenter{position:absolute;left:50%;transform:translateX(-50%);font-size:12px;color:#cccccc}
+
+  .main{display:flex;min-height:640px;position:relative;background:var(--editor)}
+  .activitybar{width:48px;background:var(--activity);display:flex;flex-direction:column;align-items:center;padding-top:4px;border-right:1px solid var(--border)}
+  .aicon{width:48px;height:48px;display:flex;align-items:center;justify-content:center;color:#868686;position:relative}
+  .aicon svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.3}
+  .aicon.active{color:#ffffff}
+  .aicon.active::before{content:"";position:absolute;left:0;top:6px;bottom:6px;width:2px;background:var(--accent)}
+  .abottom{margin-top:auto;padding-bottom:8px}
+
+  .sidebar{width:300px;background:var(--sidebar);border-right:1px solid var(--border);display:flex;flex-direction:column}
+  .sheader{height:35px;display:flex;align-items:center;padding:0 12px;font-size:11px;letter-spacing:.6px;color:#cccccc}
+  .sheader .actions{margin-left:auto;display:flex;gap:6px}
+  .iconbtn{width:22px;height:22px;border-radius:5px;display:flex;align-items:center;justify-content:center;color:#cccccc}
+  .iconbtn svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.3}
+  .iconbtn:hover{background:rgba(255,255,255,.09)}
+
+  .tree{flex:1;overflow:visible;font-size:13px}
+  .row{height:24px;display:flex;align-items:center;padding:0 8px 0 14px;gap:7px;white-space:nowrap}
+  .row .ticon{width:16px;height:16px;flex:none;color:#cccccc;display:flex}
+  .row .ticon svg{width:16px;height:16px}
+  .row .label{color:var(--text)}
+  .row .preview{color:var(--muted)}
+  .row .desc{margin-left:auto;font-size:12px;color:var(--muted);padding-right:6px}
+  .row.hovered{background:var(--hover)}
+  .row .badge{margin-left:auto;font-size:12px;color:#e2b93b;display:none}
+  .row.section{height:22px;color:#e8e8e8;font-size:11px;letter-spacing:.3px;margin-top:10px;border-top:1px solid var(--border);padding-top:2px;gap:6px}
+  .row.section .secicon{width:16px;height:16px;flex:none;display:flex;color:#808080}
+  .row.section .secicon svg{width:16px;height:16px}
+  .row.flex{padding-left:28px}
+
+  .editor{flex:1;display:flex;flex-direction:column;min-width:0}
+  .tabs{height:35px;display:flex;background:var(--titlebar)}
+  .tab{display:flex;align-items:center;padding:0 12px;font-size:13px;color:#9d9d9d;border-right:1px solid var(--border);gap:8px}
+  .tab.active{background:var(--editor);color:#ffffff;border-top:1px solid var(--accent)}
+  .code{padding:14px 0;font-family:Consolas,"Courier New",monospace;font-size:13px;line-height:19px;overflow:hidden}
+  .ln{display:flex}
+  .ln .n{width:52px;text-align:right;padding-right:22px;color:#6e7681;flex:none;user-select:none}
+  .kw{color:var(--kw)} .kw{color:var(--kws)} .s{color:var(--str)} .c{color:var(--com)} .f{color:var(--fn)} .ty{color:var(--type)} .nu{color:var(--num)}
+
+  .statusbar{height:23px;background:var(--statusbar);border-top:1px solid var(--border);display:flex;align-items:center;font-size:12px;color:#cccccc;padding:0 8px;gap:4px}
+  .sitem{display:flex;align-items:center;gap:5px;padding:0 7px;height:23px}
+  .sitem svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.3}
+  .sitem.zap svg{fill:currentColor;stroke:none}
+  .sitem.mymodel{background:rgba(255,255,255,.10);border-radius:3px}
+  .pushright{margin-left:auto}
+
+  /* ---- hover tooltip ---- */
+  .hovercard{position:absolute;left:318px;top:64px;width:430px;background:var(--hovercard);border:1px solid var(--hoverborder);border-radius:4px;box-shadow:0 5px 16px rgba(0,0,0,.5);padding:12px 14px;font-size:12.5px;color:#cccccc;z-index:20}
+  .hovercard h3{font-size:13.5px;margin-bottom:6px}
+  .hovercard .slug{font-family:Consolas,monospace;font-size:11.5px;background:rgba(110,118,129,.25);border-radius:3px;padding:1px 5px;color:#d7d7d7}
+  .hovercard table{border-collapse:collapse;margin:8px 0 2px;font-size:12px}
+  .hovercard td,.hovercard th{border:1px solid rgba(110,118,129,.4);padding:2px 10px;text-align:left}
+  .hovercard th{font-weight:600;background:rgba(110,118,129,.15)}
+  .hovercard .updated{margin-top:8px;color:#9d9d9d;font-style:italic;font-size:12px}
+  .hovercard .nb{color:#9d9d9d}
+
+  /* ---- quick pick window ---- */
+  .backdrop{position:absolute;inset:35px 0 23px 0;background:rgba(0,0,0,.30);z-index:30}
+  .quickpick{position:absolute;top:56px;left:50%;transform:translateX(-50%);width:640px;background:#222222;border:1px solid var(--hoverborder);border-radius:6px;box-shadow:0 10px 34px rgba(0,0,0,.6);z-index:40;overflow:hidden}
+  .qp-input{display:flex;align-items:center;padding:7px 12px;border-bottom:1px solid #3c3c3c;font-size:13px;color:#cccccc}
+  .qp-input .caret{display:inline-block;width:1px;height:15px;background:#cccccc;margin-left:2px;animation:blink 1s step-end infinite}
+  @keyframes blink{50%{opacity:0}}
+  .qp-list{max-height:388px;overflow:hidden}
+  .qp-item{padding:5px 12px 5px 14px;font-size:13px}
+  .qp-item .l1{display:flex;align-items:baseline;gap:10px}
+  .qp-item .label{color:#e8e8e8}
+  .qp-item .qdesc{color:var(--muted);font-size:12px}
+  .qp-item .qbtns{margin-left:auto;display:flex;gap:8px;color:#cccccc}
+  .qp-item .qbtns svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.3}
+  .qp-item .detail{color:#9d9d9d;font-size:12px;margin-top:1px}
+  .qp-item.focused{background:#04395e;outline:1px solid var(--accent)}
+  .qp-item.focused .label{color:#ffffff}
+  .qp-foot{border-top:1px solid #3c3c3c;padding:4px 12px;font-size:11px;color:#9d9d9d;display:flex;gap:14px}
+  .legend{display:flex;align-items:center;gap:8px;font-size:11px;color:#9d9d9d;margin-top:6px;padding-left:2px}
+  .legend .bar{width:120px;height:8px;border-radius:4px}
+</style>
+</head>
+<body>
+
+<h1>NeuralDash v0.2.0 — how it looks inside VS Code</h1>
+<div class="sub">Rendered with <b>real data</b> from portal.neuralwatt.com/energy-pricing (2026-08-28, tariff $10/kWh · 1 mWh ≈ 1¢ per 1k requests). Row icons use a <b>severity color scale</b> (cheap→green <code>hsl(130,85%,55%)</code>, mid→yellow <code>hsl(60,45%,55%)</code>, expensive→red <code>hsl(0,85%,55%)</code>) computed over log(7-day typical) energy; flex variants below come from <b>data/models-registry.json</b> pricing.</div>
+
+<!-- ================= WINDOW 1 : board + tooltip ================= -->
+<div class="window">
+  <div class="titlebar">
+    <div class="menubar"><span>File</span><span>Edit</span><span>Selection</span><span>View</span><span>Go</span><span>Run</span><span>Terminal</span><span>Help</span></div>
+    <div class="titlecenter">controller.ts — neuraldash — Visual Studio Code</div>
+    <div class="wincontrols"><span>&#x2500;</span><span>&#x25A1;</span><span>&#x2715;</span></div>
+  </div>
+  <div class="main" style="min-height:760px">
+    <div class="activitybar">
+      <div class="aicon"><svg viewBox="0 0 16 16"><path d="M2.5 2h4v1.5H4v9h2.5V14h-4V2zm8.5 0h2.5v12H11v-1.5h1V3.5H11V2z"/></svg></div>
+      <div class="aicon"><svg viewBox="0 0 16 16"><circle cx="6.5" cy="6.5" r="4"/><path d="M9.7 9.7 13.5 13.5"/></svg></div>
+      <div class="aicon"><svg viewBox="0 0 16 16"><circle cx="4.5" cy="3.5" r="1.7"/><circle cx="4.5" cy="12.5" r="1.7"/><circle cx="11.5" cy="6" r="1.7"/><path d="M4.5 5.2v5.6M11.5 7.7c0 2.5-3.5 2.3-5.3 3.3"/></svg></div>
+      <div class="aicon"><svg viewBox="0 0 16 16"><path d="M5 3.5v9M5 3.5 3.5 5M5 3.5 6.5 5M11 12.5v-9M11 12.5 9.5 11M11 12.5l1.5-1.5"/></svg></div>
+      <div class="aicon"><svg viewBox="0 0 16 16"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg></div>
+      <div class="aicon active"><svg viewBox="0 0 16 16"><path d="M9.5 1 3.5 9.2h3.4L6 15l6.5-8.2H9.1L9.5 1z"/></svg></div>
+      <div class="aicon abottom"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.2"/><path d="M8 2v2.2M8 11.8V14M2 8h2.2M11.8 8H14M3.8 3.8l1.6 1.6M10.6 10.6l1.6 1.6M12.2 3.8l-1.6 1.6M5.4 10.6l-1.6 1.6"/></svg></div>
+    </div>
+
+    <div class="sidebar" style="min-height:760px">
+      <div class="sheader">NEURALWATT ENERGY
+        <div class="actions"><div class="iconbtn" title="neuraldash.refresh"><svg viewBox="0 0 16 16"><path d="M13.4 6.2A5.5 5.5 0 1 0 13.9 9M13.9 3.5V7h-3.5"/></svg></div><div class="iconbtn" title="views ..."><svg viewBox="0 0 16 16"><circle cx="3" cy="8" r=".9"/><circle cx="8" cy="8" r=".9"/><circle cx="13" cy="8" r=".9"/></svg></div></div>
+      </div>
+      <div class="tree" id="board"></div>
+      <div class="legend"><span style="color:#5bc97a">● cheap</span><span class="bar" id="legend-bar"></span><span style="color:#e05d5d">● expensive</span></div>
+    </div>
+
+    <div class="editor">
+      <div class="tabs">
+        <div class="tab active">controller.ts &#x2715;</div>
+        <div class="tab">package.json</div>
+      </div>
+      <div class="code">
+        <div class="ln"><span class="n">40</span><span>&nbsp;&nbsp;<span class="c">// stale-first render, then schedule the polite poll loop</span></span></div>
+        <div class="ln"><span class="n">41</span><span>&nbsp;&nbsp;<span class="kw">private</span> <span class="f">schedule</span>(): <span class="kw">void</span> {</span></div>
+        <div class="ln"><span class="n">42</span><span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">const</span> minutes = <span class="ty">Math</span>.<span class="f">max</span>(<span class="nu">5</span>, <span class="kw">this</span>.cfg.pollIntervalMinutes);</span></div>
+        <div class="ln"><span class="n">43</span><span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">this</span>.timer = <span class="f">setTimeout</span>(() =&gt; <span class="kw">void this</span>.<span class="f">refresh</span>(), minutes * <span class="nu">60_000</span>);</span></div>
+        <div class="ln"><span class="n">44</span><span>&nbsp;&nbsp;}</span></div>
+        <div class="ln"><span class="n">45</span><span></span></div>
+        <div class="ln"><span class="n">46</span><span>&nbsp;&nbsp;<span class="c">// backoff doubles on blocked/error, capped at 120 min</span></span></div>
+        <div class="ln"><span class="n">47</span><span>&nbsp;&nbsp;<span class="kw">private</span> <span class="f">onFailure</span>(): <span class="kw">void</span> {</span></div>
+        <div class="ln"><span class="n">48</span><span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">this</span>.backoff = <span class="ty">Math</span>.<span class="f">min</span>(<span class="kw">this</span>.backoff * <span class="nu">2</span>, <span class="nu">120</span>);</span></div>
+      </div>
+    </div>
+
+    <!-- hover tooltip for row 1 -->
+    <div class="hovercard">
+      <h3>Qwen3.6 35B &nbsp;<span class="slug">qwen3.6-35b</span></h3>
+      <table>
+        <tr><td>Right now</td><td>120.37 mWh</td></tr>
+        <tr><td>Typical (7d)</td><td>25.48 mWh</td></tr>
+        <tr><td>Basis</td><td>25.48 mWh</td></tr>
+        <tr><td>Cost/1k</td><td>$1.20</td></tr>
+        <tr><td>Trend</td><td>&#x25BC; 19% below</td></tr>
+        <tr><td>Cache</td><td>34%</td></tr>
+        <tr><td>Context</td><td>1k-4k</td></tr>
+        <tr><td>Value</td><td class="nb">no benchmark</td></tr>
+      </table>
+      <table>
+        <tr><th>Band</th><th>mWh</th><th>Share</th></tr>
+        <tr><td>0-256</td><td>54.55</td><td>9.3%</td></tr>
+        <tr><td>256-1k</td><td>64.93</td><td>27.2%</td></tr>
+        <tr><td>1k-4k</td><td>25.48</td><td>18.4%</td></tr>
+        <tr><td>4k-16k</td><td>297.65</td><td>7.7%</td></tr>
+        <tr><td>16k-64k</td><td>232.93</td><td>17.6%</td></tr>
+        <tr><td>64k-256k</td><td>263.70</td><td>19.8%</td></tr>
+        <tr><td>256k-1M</td><td>&mdash;</td><td>&mdash;</td></tr>
+      </table>
+      <div class="updated">Last updated: 2026-08-28T08:23Z</div>
+    </div>
+  </div>
+  <div class="statusbar">
+    <div class="sitem"><svg viewBox="0 0 16 16"><circle cx="4" cy="3.5" r="1.5"/><circle cx="4" cy="12.5" r="1.5"/><circle cx="11" cy="6" r="1.5"/><path d="M4 5v6M11 7.5C11 10 7.5 9.6 5.5 10.6"/></svg> main*</div>
+    <div class="sitem">&#x2716; 0 &nbsp;&#x26A0; 0</div>
+    <div class="sitem pushright mymodel"><svg class="zap" viewBox="0 0 16 16"><path d="M9.5 1 3.5 9.2h3.4L6 15l6.5-8.2H9.1L9.5 1z"/></svg> DeepSeek V4 Flash &middot; 214.3 mWh &middot; $2.14/1k</div>
+    <div class="sitem">Ln 42, Col 17</div>
+    <div class="sitem">Spaces: 2</div>
+    <div class="sitem">UTF-8</div>
+    <div class="sitem">TypeScript</div>
+  </div>
+</div>
+<div class="caption"><b>1.</b> The bolt icon in the activity bar opens the <b>Neuralwatt Energy</b> board &mdash; every model, cheapest 7-day-typical first. Row zap icons are tinted by a <b>severity color scale</b> ( <span style="color:hsl(130,85%,55%)">● cheapest green</span> → <span style="color:hsl(60,45%,55%)">yellow</span> → <span style="color:hsl(0,85%,55%)">● most expensive red</span>, saturation 45% mid → 85% extremes) computed over log(basis) energy. Grey zap = no live data (flex rows). The collapsible <b>Flex tiers — registry pricing, no live energy data</b> section lists -flex variants from data/models-registry.json (pricing only). Disable either with <code>neuraldash.colorScale</code> / <code>neuraldash.showFlexTiers</code>.</div>
+
+<!-- ================= WINDOW 2 : quick pick ================= -->
+<div class="window">
+  <div class="titlebar">
+    <div class="menubar"><span>File</span><span>Edit</span><span>Selection</span><span>View</span><span>Go</span><span>Run</span><span>Terminal</span><span>Help</span></div>
+    <div class="titlecenter">neuraldash &mdash; Visual Studio Code</div>
+    <div class="wincontrols"><span>&#x2500;</span><span>&#x25A1;</span><span>&#x2715;</span></div>
+  </div>
+  <div class="main" style="height:560px">
+    <div class="activitybar">
+      <div class="aicon"><svg viewBox="0 0 16 16"><path d="M2.5 2h4v1.5H4v9h2.5V14h-4V2zm8.5 0h2.5v12H11v-1.5h1V3.5H11V2z"/></svg></div>
+      <div class="aicon active"><svg viewBox="0 0 16 16"><path d="M9.5 1 3.5 9.2h3.4L6 15l6.5-8.2H9.1L9.5 1z"/></svg></div>
+    </div>
+    <div class="sidebar" style="filter:brightness(.55)">
+      <div class="sheader">NEURALWATT ENERGY</div>
+      <div class="tree" id="board2"></div>
+    </div>
+    <div class="editor" style="filter:brightness(.55)"><div class="tabs"><div class="tab active">controller.ts</div></div></div>
+
+    <div class="backdrop"></div>
+    <div class="quickpick">
+      <div class="qp-input">Best value &mdash; highest score / mWh<span class="caret"></span></div>
+      <div class="qp-list" id="qplist"></div>
+      <div class="qp-foot"><span>&#x21B5; open</span><span>buttons: copy slug / copy models.dev id</span><span>type to filter</span></div>
+    </div>
+  </div>
+  <div class="statusbar">
+    <div class="sitem pushright mymodel"><svg class="zap" viewBox="0 0 16 16"><path d="M9.5 1 3.5 9.2h3.4L6 15l6.5-8.2H9.1L9.5 1z"/></svg> DeepSeek V4 Flash &middot; 214.3 mWh &middot; $2.14/1k</div>
+  </div>
+</div>
+<div class="caption"><b>2.</b> <b>&ldquo;NeuralDash: Pick best-value model&rdquo;</b> quick pick (this is the real item format). Sorted by value score, energy-only models after &mdash; exactly what you see today while <code>data/scores.json</code> is empty. The two buttons on each row copy the slug / models.dev ID to the clipboard. Once you seed real benchmark scores, rows gain a <b>score&nbsp;NN/100</b> in the description, a <b>value 0.xxxx</b> detail, and the board&rsquo;s best model gets a &#9733; star icon.</div>
+
+<script>
+  // === Severity color helpers (same formula as src/core/color.ts) ===
+  function severityColor(s){
+    const c=Math.max(0,Math.min(1,s));
+    let h;
+    if(c<=0.5) h=130-140*c;
+    else h=60-120*(c-0.5);
+    const sat=45+40*Math.abs(2*c-1);
+    return `hsl(${Math.round(h)}, ${Math.round(sat)}%, 55%)`;
+  }
+  function computeScale(bases){
+    const valid=bases.filter(v=>v!=null && isFinite(v) && v>0);
+    if(valid.length===0) return {lnMin:0,lnMax:0,count:0};
+    const lns=valid.map(v=>Math.log(v));
+    return {lnMin:Math.min(...lns),lnMax:Math.max(...lns),count:valid.length};
+  }
+  function severityOf(basis, scale){
+    if(basis==null || !isFinite(basis) || basis<=0) return 0.5;
+    if(scale.count<2) return 0.5;
+    const range=scale.lnMax-scale.lnMin;
+    if(range===0) return 0.5;
+    const t=(Math.log(basis)-scale.lnMin)/range;
+    return Math.max(0,Math.min(1,t));
+  }
+  function zapSvg(color){
+    return `<svg viewBox="0 0 16 16"><path fill="${color}" d="M9.5 1 3.5 9.2h3.4L6 15l6.5-8.2H9.1L9.5 1z"/></svg>`;
+  }
+  // Basis values = 7-day typical (cheapest sort basis) — real numbers from the live board data shape.
+  // Using the board's 7-day typical values as displayed in the description (left side)
+  // Order is sorted by typical asc as the extension renders.
+  const boardBasis = [
+    25.48,  // Qwen3.6 35B
+    21.0,   // Qwen3.6 35B Fast (cheapest)
+    68.7,   // Gemma 4 31B
+    88.06,  // Qwen 3.8 27B
+    214.3,  // DeepSeek V4 Flash
+    144.7,  // Kimi K2.7 Code Fast
+    757.9,  // Kimi K2.7 Code
+    953.8,  // GLM-5.2 (short, fast)
+    550.7,  // GLM-5.2 (fast)
+    966.1,  // GLM-5.2 (short)
+    1920.0, // DeepSeek V4-Pro
+    1430.0, // Kimi K3 Fast
+    1870.0, // GLM-5.2
+    1700.0, // Kimi K3
+  ];
+  const scale = computeScale(boardBasis);
+  // Flex tiers — real data from data/models-registry.json (6 entries, sorted by cost.input asc)
+  const flexRows = [
+    ["DeepSeek V4 Flash Flex", "$0.09 in · $0.18 out /1M tok"],
+    ["Kimi K2.7 Code Flex", "$0.62 in · $2.60 out /1M tok"],
+    ["GLM 5.2 Flex", "$0.94 in · $2.92 out /1M tok"],
+    ["GLM 5.2 Short Fast Flex", "$0.94 in · $2.92 out /1M tok"],
+    ["GLM 5.2 Short Flex", "$0.94 in · $2.92 out /1M tok"],
+    ["Kimi K3 Flex", "$1.95 in · $9.75 out /1M tok"],
+  ];
+  const greySvg = zapSvg("#808080");
+  const rows = [
+    ["Qwen3.6 35B",            false, "120.4 mWh · $1.20/1k"],
+    ["Qwen3.6 35B Fast",       false, "21.0 mWh · $0.21/1k"],
+    ["Gemma 4 31B",            false, "68.7 mWh · $0.69/1k"],
+    ["Qwen 3.8 27B",           true,  "184.9 mWh · $1.85/1k"],
+    ["DeepSeek V4 Flash",      false, "214.3 mWh · $2.14/1k"],
+    ["Kimi K2.7 Code Fast",    false, "144.7 mWh · $1.45/1k"],
+    ["Kimi K2.7 Code",         false, "757.9 mWh · $7.58/1k"],
+    ["GLM-5.2 (short, fast)",  false, "953.8 mWh · $9.54/1k"],
+    ["GLM-5.2 (fast)",         false, "550.7 mWh · $5.51/1k"],
+    ["GLM-5.2 (short)",        false, "966.1 mWh · $9.66/1k"],
+    ["DeepSeek V4-Pro",        true,  "1920.0 mWh · $19.20/1k"],
+    ["Kimi K3 Fast",           false, "1430.0 mWh · $14.30/1k"],
+    ["GLM-5.2",                false, "1870.0 mWh · $18.70/1k"],
+    ["Kimi K3",                false, "1700.0 mWh · $17.00/1k"],
+  ];
+  function boardHTML(){
+    const boardRows = rows.map((r,i) => {
+      const basis = boardBasis[i];
+      const s = severityOf(basis, scale);
+      const color = severityColor(s);
+      const svg = zapSvg(color);
+      return `
+      <div class="row">
+        <span class="ticon" style="color:${color}">${svg}</span>
+        <span class="label">${r[0]}${r[1] ? ' <span class="preview">(preview)</span>' : ""}</span>
+        <span class="desc">${r[2]}</span>
+      </div>`;
+    }).join("");
+    const section = `
+      <div class="row section">
+        <span class="secicon">${greySvg}</span>
+        <span>Flex tiers — registry pricing, no live energy data</span>
+      </div>`;
+    const flex = flexRows.map(r => `
+      <div class="row flex">
+        <span class="ticon" style="color:#808080">${greySvg}</span>
+        <span class="label">${r[0]}</span>
+        <span class="desc">${r[1]}</span>
+      </div>`).join("");
+    return boardRows + section + flex;
+  }
+  document.getElementById("board").innerHTML = boardHTML();
+  document.getElementById("board2").innerHTML = boardHTML();
+  // legend gradient: green -> yellow -> red
+  document.getElementById("legend-bar").style.background = "linear-gradient(90deg, hsl(130,85%,55%), hsl(60,45%,55%), hsl(0,85%,55%))";
+  // Also keep hoverFirst highlight on first row
+  const firstRow = document.querySelector("#board .row");
+  if(firstRow) firstRow.classList.add("hovered");
+
+  // Quick pick: same data, ordered by value (nulls last → basis asc) — identical to board order while scores are empty
+  const qp = rows.map(r => ({name:r[0], mwh:r[2]}));
+  document.getElementById("qplist").innerHTML = qp.map((r,i) => `
+    <div class="qp-item${i===0 ? " focused":""}">
+      <div class="l1"><span class="label">${r.name}</span><span class="qdesc">${r.mwh.split("·")[0].trim()}</span>
+        <span class="qbtns">
+          <svg viewBox="0 0 16 16" title="Copy slug"><rect x="5.5" y="5.5" width="8" height="8" rx="1"/><path d="M10.5 5.5V3.5a1 1 0 0 0-1-1h-6a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2"/></svg>
+          <svg viewBox="0 0 16 16" title="Copy models.dev id"><circle cx="8" cy="8" r="5.5"/><path d="M2.5 8h11M8 2.5c-4 3.5-4 7.5 0 11 4-3.5 4-7.5 0-11z"/></svg>
+        </span>
+      </div>
+      <div class="detail">no benchmark</div>
+    </div>`).join("");
+</script>
+</body>
+</html>
