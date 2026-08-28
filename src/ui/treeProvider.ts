@@ -110,26 +110,37 @@ export class BoardTreeProvider implements vscode.TreeDataProvider<vscode.TreeIte
     item.iconPath = new vscode.ThemeIcon(isBest ? "star-full" : "zap");
     item.contextValue = isBest ? "model.best" : v.quote.isPreview ? "model.preview" : "model";
 
-    // Tooltip
+    // Tooltip: do NOT set isTrusted — external strings (displayName/slug/contextBand/score.source)
+    // could contain markdown command links. Use appendText() for external values so they are escaped.
     const md = new vscode.MarkdownString(undefined, true);
-    md.isTrusted = true;
+    // Build markdown safely: static structure via value, external strings via appendText
+    const headerBase = `**${escapeMarkdown(v.quote.displayName)}**  \n\`slug: ${escapeMarkdown(v.quote.slug)}\``;
     const lines: string[] = [];
-    lines.push(`**${v.quote.displayName}**  \n\`slug: ${v.quote.slug}\``);
+    lines.push(headerBase);
     if (isBest) lines.push(`\n$(star-full) **Best value**`);
     lines.push("");
     lines.push(`| Field | Value |`);
     lines.push(`|---|---|`);
-    lines.push(`| Right now | ${v.quote.rightNowMwh != null ? `${v.quote.rightNowMwh.toFixed(2)} mWh` : "-" } |`);
-    lines.push(`| Typical (7d) | ${v.quote.typicalMwh != null ? `${v.quote.typicalMwh.toFixed(2)} mWh` : "-" } |`);
-    lines.push(`| Basis | ${v.basisMwh != null ? `${v.basisMwh.toFixed(2)} mWh` : "—" } |`);
+    const rightNowStr = v.quote.rightNowMwh != null ? `${v.quote.rightNowMwh.toFixed(2)} mWh` : "-";
+    const typicalStr = v.quote.typicalMwh != null ? `${v.quote.typicalMwh.toFixed(2)} mWh` : "-";
+    const basisStr = v.basisMwh != null ? `${v.basisMwh.toFixed(2)} mWh` : "—";
+    lines.push(`| Right now | ${rightNowStr} |`);
+    lines.push(`| Typical (7d) | ${typicalStr} |`);
+    lines.push(`| Basis | ${basisStr} |`);
     if (cost != null && mwh != null) lines.push(`| Cost/1k | $${cost.toFixed(2)} |`);
     if (v.quote.trend) {
       const arrow = v.quote.trend.direction === "above" ? "▲" : v.quote.trend.direction === "below" ? "▼" : "—";
-      lines.push(`| Trend | ${arrow} ${v.quote.trend.pct}% ${v.quote.trend.direction} |`);
+      lines.push(`| Trend | ${arrow} ${v.quote.trend.pct}% ${escapeMarkdown(v.quote.trend.direction)} |`);
     }
     if (v.quote.cachePct != null) lines.push(`| Cache | ${v.quote.cachePct}% |`);
-    if (v.quote.contextBand) lines.push(`| Context | ${v.quote.contextBand} |`);
-    if (v.score) lines.push(`| Score | ${v.score.performanceScore} (${v.score.source}) |`);
+    if (v.quote.contextBand) {
+      // contextBand is external but from scraped HTML — escape it
+      lines.push(`| Context | ${escapeMarkdown(v.quote.contextBand)} |`);
+    }
+    if (v.score) {
+      // score.source is external / user-provided — escape
+      lines.push(`| Score | ${v.score.performanceScore} (${escapeMarkdown(v.score.source)}) |`);
+    }
     if (v.value != null) lines.push(`| Value | ${v.value.toFixed(4)} (score/mWh) |`);
     else lines.push(`| Value | no benchmark |`);
     if (v.quote.bands.length > 0) {
@@ -139,16 +150,22 @@ export class BoardTreeProvider implements vscode.TreeDataProvider<vscode.TreeIte
       for (const b of v.quote.bands) {
         const m = b.mwh != null ? `${b.mwh.toFixed(2)}` : "—";
         const s = b.sharePct != null ? `${b.sharePct.toFixed(1)}%` : "—";
-        lines.push(`| ${b.band} | ${m} | ${s} |`);
+        lines.push(`| ${escapeMarkdown(b.band)} | ${m} | ${s} |`);
       }
     }
-    if (this.snapshot) lines.push(`\n_Last updated: ${this.snapshot.fetchedAt}_`);
+    if (this.snapshot) lines.push(`\n_Last updated: ${escapeMarkdown(this.snapshot.fetchedAt)}_`);
     md.value = lines.join("\n");
     item.tooltip = md;
 
-    // command on click: open pricing page?
     item.command = undefined;
 
     return item;
   }
+}
+
+function escapeMarkdown(text: string): string {
+  // Escape markdown special chars that could form links/commands when md is rendered.
+  // Minimal: escape backticks, brackets, parens that could form [text](url) or command: links.
+  // Also escape backslashes first.
+  return text.replace(/\\/g, "\\\\").replace(/`/g, "\\`").replace(/\[/g, "\\[").replace(/\]/g, "\\]").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
 }

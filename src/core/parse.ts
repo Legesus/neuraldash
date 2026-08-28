@@ -15,11 +15,6 @@ function cleanText(el: HTMLElement | null | undefined): string {
   return el.text.trim();
 }
 
-function textContent(html: string): string {
-  // fallback for simple text extraction from raw when using HTMLElement text
-  return html;
-}
-
 function findTables(root: HTMLElement): { board: HTMLElement | null; grid: HTMLElement | null } {
   const tables = root.querySelectorAll("table");
   let board: HTMLElement | null = null;
@@ -84,6 +79,17 @@ function parseContextBand(tdTextSmall: string | null): string | null {
   return first.replace(/\u2013/g, "-").replace(/\u2014/g, "-");
 }
 
+function isPreviewCell(cell: HTMLElement): boolean {
+  // Prefer the semantic title: anchor whose title contains "is in preview"
+  const anchors = cell.querySelectorAll("a[title]");
+  for (const a of anchors) {
+    const t = a.getAttribute("title") ?? "";
+    if (t.toLowerCase().includes("is in preview")) return true;
+  }
+  // Fallback: class hash probe
+  return !!cell.querySelector("a[class*='bg-amber']") || cell.innerHTML.includes("bg-amber");
+}
+
 function extractBoardRows(board: HTMLElement): Map<string, Partial<ModelQuote>> {
   const tbody = board.querySelector("tbody");
   const container = tbody ?? board;
@@ -120,8 +126,7 @@ function extractBoardRows(board: HTMLElement): Map<string, Partial<ModelQuote>> 
     }
     if (!displayName) continue;
 
-    // preview = contains a[class*='bg-amber']
-    const isPreview = !!firstCell.querySelector("a[class*='bg-amber']") || firstCell.innerHTML.includes("bg-amber");
+    const isPreview = isPreviewCell(firstCell);
 
     // contextBand + cachePct
     // context band is in div.text-[10px].font-mono-data
@@ -206,12 +211,40 @@ function extractGridRows(grid: HTMLElement): Map<string, BandEnergy[]> {
   for (const row of rows) {
     const cells = row.querySelectorAll("td");
     if (cells.length < 1) continue;
-    // name = cells[0] div.num text
+    // name = cells[0] div.num text — but preview rows contain an <a>Preview</a> badge inside the same div.
+    // Reading div.num.text yields "DeepSeek V4-ProPreview" -> wrong slug and failed join.
+    // Strip badge anchors before reading, or take the first text node.
     const firstCell = cells[0];
     let displayName = "";
     const nameDiv = firstCell.querySelector("div.num");
-    if (nameDiv) displayName = cleanText(nameDiv);
-    else displayName = cleanText(firstCell);
+    if (nameDiv) {
+      // Preview rows: <div class="num">DeepSeek V4-Pro<a>Preview</a></div> -> div.num.text is "DeepSeek V4-ProPreview".
+      // Strip the badge anchor text without relying on cloneNode (not in HTMLElement typings).
+      const anchor = nameDiv.querySelector("a");
+      let raw = cleanText(nameDiv);
+      if (anchor) {
+        const anchorText = cleanText(anchor);
+        if (raw.endsWith(anchorText) && anchorText.length > 0) {
+          raw = raw.slice(0, -anchorText.length).trim();
+        } else {
+          // fallback: regex strip trailing Preview (live badge is always "Preview")
+          raw = raw.replace(/\s*Preview\s*$/, "").trim();
+        }
+      }
+      displayName = raw;
+    } else {
+      const anchor = firstCell.querySelector("a");
+      let raw = cleanText(firstCell);
+      if (anchor) {
+        const anchorText = cleanText(anchor);
+        if (raw.endsWith(anchorText) && anchorText.length > 0) {
+          raw = raw.slice(0, -anchorText.length).trim();
+        } else {
+          raw = raw.replace(/\s*Preview\s*$/, "").trim();
+        }
+      }
+      displayName = raw;
+    }
     if (!displayName) continue;
     const slug = toSlug(displayName);
 

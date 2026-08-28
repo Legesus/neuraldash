@@ -47,14 +47,11 @@ export class NeuralwattProvider implements DataProvider {
         return { status: "error", snapshot: null, detail: `ParseError: ${msg}` };
       }
 
-      const result: ProviderResult & { etag?: string | null } = {
+      return {
         status: "ok",
         snapshot,
+        etag: etagOut,
       };
-      // attach etag via detail or keep separate? Controller reads header separately if needed.
-      // For now, stash in (result as any).etag
-      (result as unknown as Record<string, unknown>).etag = etagOut;
-      return result;
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
       if (msg.includes("abort")) return { status: "error", snapshot: null, detail: "Timeout after 30s" };

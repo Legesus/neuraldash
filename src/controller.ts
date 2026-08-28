@@ -129,8 +129,7 @@ export class Controller {
       }
 
       if (result.status === "ok" && result.snapshot) {
-        const etagOut = (result as unknown as Record<string, string | null>).etag ?? null;
-        // Try to read etag from result if present; otherwise keep prior etag
+        const etagOut = result.etag ?? null;
         const etagToSave = etagOut ?? etag ?? null;
         await this.cache.saveSnapshot(result.snapshot, etagToSave);
         this.render(result.snapshot);

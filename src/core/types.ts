@@ -44,6 +44,7 @@ export interface ProviderResult {
   snapshot: Snapshot | null;
   detail?: string;
   notModified?: boolean;
+  etag?: string | null;
 }
 
 export interface DataProvider {
