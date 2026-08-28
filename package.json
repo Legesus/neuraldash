@@ -1,0 +1,153 @@
+{
+  "name": "neuraldash",
+  "displayName": "NeuralDash — Energy Board",
+  "description": "Live NeuralWatt energy-per-request board with value ranking and status bar.",
+  "publisher": "adamd",
+  "version": "0.1.0",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onView:neuralwatt.board",
+    "onCommand:neuraldash.refresh",
+    "onCommand:neuraldash.sortByEnergy",
+    "onCommand:neuraldash.sortByValue",
+    "onCommand:neuraldash.sortByName",
+    "onCommand:neuraldash.pickBestValue",
+    "onCommand:neuraldash.setMyModel",
+    "onCommand:neuraldash.openPricingPage"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "neuralwatt-energy",
+          "title": "NeuralWatt",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "neuralwatt-energy": [
+        {
+          "type": "tree",
+          "id": "neuralwatt.board",
+          "name": "Energy Board"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "neuraldash.refresh",
+        "title": "NeuralDash: Refresh Board",
+        "category": "NeuralDash",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "neuraldash.sortByEnergy",
+        "title": "Sort by Energy",
+        "category": "NeuralDash"
+      },
+      {
+        "command": "neuraldash.sortByValue",
+        "title": "Sort by Value",
+        "category": "NeuralDash"
+      },
+      {
+        "command": "neuraldash.sortByName",
+        "title": "Sort by Name",
+        "category": "NeuralDash"
+      },
+      {
+        "command": "neuraldash.pickBestValue",
+        "title": "Pick Best Value",
+        "category": "NeuralDash"
+      },
+      {
+        "command": "neuraldash.setMyModel",
+        "title": "Set My Model",
+        "category": "NeuralDash"
+      },
+      {
+        "command": "neuraldash.openPricingPage",
+        "title": "Open Pricing Page",
+        "category": "NeuralDash"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "neuraldash.refresh",
+          "when": "view == neuralwatt.board",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "neuraldash.openPricingPage",
+          "when": "view == neuralwatt.board",
+          "group": "inline"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "NeuralDash",
+      "properties": {
+        "neuraldash.pollIntervalMinutes": {
+          "type": "number",
+          "default": 20,
+          "minimum": 5,
+          "description": "Poll interval in minutes (min 5)."
+        },
+        "neuraldash.tariffPerKWh": {
+          "type": "number",
+          "default": 10,
+          "description": "Tariff per kWh in USD (used for cost display)."
+        },
+        "neuraldash.preferredBand": {
+          "type": "string",
+          "enum": [
+            "typical",
+            "auto",
+            "0-256",
+            "256-1k",
+            "1k-4k",
+            "4k-16k",
+            "16k-64k",
+            "64k-256k",
+            "256k-1M"
+          ],
+          "default": "typical",
+          "description": "Basis for value ranking: typical / auto / explicit band."
+        },
+        "neuraldash.myModel": {
+          "type": "string",
+          "default": "",
+          "description": "Your model slug for status bar display."
+        },
+        "neuraldash.scoresOverridePath": {
+          "type": "string",
+          "default": "",
+          "description": "Absolute path to a JSON file overriding data/scores.json (user-wins per slug)."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p .",
+    "test": "tsc -p . && node --test out/test/",
+    "watch": "tsc -p . --watch"
+  },
+  "dependencies": {
+    "node-html-parser": "^6.1.13"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.1",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.9.3"
+  }
+}
