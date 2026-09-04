@@ -69,24 +69,26 @@ export class CacheManager {
   }
 }
 
-/** VS Code-backed storage adapter shape (structural, not imported). */
-export function createVsCodeStorage(
+/** VS Code-backed storage adapter shape (structural, not imported). Generic over the
+ *  versioned payload so registry-cache.json gets a fully typed storage with no casts.
+ *  The default type keeps existing board-cache call sites unchanged. */
+export function createVsCodeStorage<T extends { version: number } = CacheData>(
   globalStorageUriFsPath: string,
   fsImpl: { readFile(p: string, enc: string): Promise<string>; writeFile(p: string, data: string): Promise<void>; mkdir(p: string, opts: { recursive: boolean }): Promise<void> },
   fileName = "cache.json",
-): CacheStorage {
+): { read(): Promise<T | null>; write(data: T): Promise<void> } {
   const path = globalStorageUriFsPath + "/" + fileName;
   return {
-    async read(): Promise<CacheData | null> {
+    async read(): Promise<T | null> {
       try {
         const raw = await fsImpl.readFile(path, "utf8");
-        const parsed = JSON.parse(raw) as CacheData;
+        const parsed = JSON.parse(raw) as T;
         return parsed;
       } catch {
         return null;
       }
     },
-    async write(data: CacheData): Promise<void> {
+    async write(data: T): Promise<void> {
       const dir = globalStorageUriFsPath;
       try {
         await fsImpl.mkdir(dir, { recursive: true });

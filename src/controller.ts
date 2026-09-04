@@ -234,6 +234,9 @@ export class Controller {
         }
       }
       // blocked / error -> silent no-op
+    } catch {
+      // Silent: a fire-and-forget refresh must never surface as an unhandled
+      // rejection and must never touch treeView.message, backoff, or scheduling.
     } finally {
       this.registryFetching = false;
     }

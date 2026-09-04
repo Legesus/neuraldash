@@ -6,6 +6,7 @@ import { StatusBarController } from "./ui/statusBar";
 import { pickBestValueQuickPick, pickMyModel } from "./ui/quickPicks";
 import { CacheManager, createVsCodeStorage } from "./core/cache";
 import { RegistryCacheManager } from "./core/registryCache";
+import type { RegistryCacheData } from "./core/registryCache";
 import { NeuralwattProvider } from "./providers/neuralwattProvider";
 import { ModelsDevRegistryProvider } from "./providers/modelsDevProvider";
 import { Controller } from "./controller";
@@ -25,8 +26,8 @@ export function activate(context: vscode.ExtensionContext): void {
   };
   const storage = createVsCodeStorage(storagePath, fsImpl as never);
   const cache = new CacheManager(storage);
-  const registryStorage = createVsCodeStorage(storagePath, fsImpl as never, "registry-cache.json");
-  const registryStore = new RegistryCacheManager(registryStorage as never);
+  const registryStorage = createVsCodeStorage<RegistryCacheData>(storagePath, fsImpl as never, "registry-cache.json");
+  const registryStore = new RegistryCacheManager(registryStorage);
 
   const tree = new BoardTreeProvider(context);
   const treeView = vscode.window.createTreeView("neuralwatt.board", {
