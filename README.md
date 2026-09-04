@@ -45,6 +45,14 @@ Live NeuralWatt **energy-per-request** board inside VS Code. Shows `Right now` a
 - `Set My Model`
 - `Open Pricing Page`
 
+## Flex tiers (live registry)
+
+The Flex tiers section prices `-flex` variants not on the live board. Pricing refreshes live from
+`https://models.dev/api.json` on every board refresh cycle (cheap `304` when unchanged), with the last
+live fetch cached to global storage and the bundled `data/models-registry.json` as offline fallback.
+The flex tooltip `Source` row shows provenance: `(live, fetched …)`, `(cached …)`, or `bundled registry (…)`.
+Registry failures are silent — the board never waits on or reports them.
+
 ## Development
 
 ```sh
