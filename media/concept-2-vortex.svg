@@ -1,0 +1,40 @@
+<svg viewBox="0 0 256 256" width="256" height="256" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="vortex-grad-1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00f5d4" />
+      <stop offset="50%" stop-color="#06b6d4" />
+      <stop offset="100%" stop-color="#3b82f6" />
+    </linearGradient>
+    <linearGradient id="vortex-grad-2" x1="100%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#10b981" />
+      <stop offset="100%" stop-color="#06b6d4" />
+    </linearGradient>
+    <filter id="glow-core" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+  <!-- Squircle Tile -->
+  <rect width="256" height="256" rx="56" fill="#080d1a" />
+  <rect x="2" y="2" width="252" height="252" rx="54" fill="none" stroke="rgba(6,182,212,0.18)" stroke-width="2" />
+
+  <!-- Orbital Neural Loops -->
+  <path d="M 52 128 C 52 82 86 46 132 46 C 182 46 214 86 210 134 C 206 178 168 212 124 210 C 80 208 50 174 54 136" 
+        fill="none" stroke="url(#vortex-grad-1)" stroke-width="9" stroke-linecap="round" opacity="0.45" />
+
+  <path d="M 128 66 C 166 66 194 96 190 134 C 186 168 156 192 124 190 C 88 188 68 160 74 128 C 80 96 108 82 134 86" 
+        fill="none" stroke="url(#vortex-grad-2)" stroke-width="11" stroke-linecap="round" filter="url(#glow-core)" />
+
+  <!-- Synapse Node Dots -->
+  <circle cx="52" cy="128" r="6" fill="#00f5d4" />
+  <circle cx="132" cy="46" r="5" fill="#06b6d4" />
+  <circle cx="210" cy="134" r="6" fill="#3b82f6" />
+  <circle cx="124" cy="210" r="5" fill="#10b981" />
+  
+  <!-- Central Energy Core Spark -->
+  <polygon points="128,96 136,120 160,128 136,136 128,160 120,136 96,128 120,120" 
+           fill="#ffffff" filter="url(#glow-core)" />
+  <polygon points="128,108 133,123 148,128 133,133 128,148 123,133 108,128 123,123" 
+           fill="#00f5d4" />
+</svg>
+

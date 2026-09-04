@@ -1,0 +1,40 @@
+<svg viewBox="0 0 256 256" width="256" height="256" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="gauge-grad" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#10b981" />
+      <stop offset="50%" stop-color="#f59e0b" />
+      <stop offset="100%" stop-color="#f43f5e" />
+    </linearGradient>
+    <linearGradient id="bolt-grad-1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="50%" stop-color="#fef08a" />
+      <stop offset="100%" stop-color="#f59e0b" />
+    </linearGradient>
+    <filter id="glow-gauge" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+  <!-- Squircle Tile -->
+  <rect width="256" height="256" rx="56" fill="#0b0f19" />
+  <rect x="2" y="2" width="252" height="252" rx="54" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="2" />
+  
+  <!-- Inactive Arc -->
+  <path d="M 74.26 187.74 A 76 76 0 1 1 181.74 187.74" fill="none" stroke="#1e293b" stroke-width="14" stroke-linecap="round" />
+  
+  <!-- Active Gradient Arc (75% filled) -->
+  <path d="M 74.26 187.74 A 76 76 0 1 1 180 134" fill="none" stroke="url(#gauge-grad)" stroke-width="14" stroke-linecap="round" filter="url(#glow-gauge)" />
+
+  <!-- Dial Ticks -->
+  <circle cx="74.26" cy="187.74" r="3.5" fill="#10b981" />
+  <circle cx="128" cy="58" r="3.5" fill="#f59e0b" />
+  <circle cx="181.74" cy="187.74" r="3.5" fill="#f43f5e" />
+
+  <!-- Lightning Needle Center -->
+  <path d="M 142 66 L 108 136 H 134 L 118 196 L 160 120 H 134 Z" fill="url(#bolt-grad-1)" filter="url(#glow-gauge)" />
+  
+  <!-- Bottom Readout Pill -->
+  <rect x="94" y="208" width="68" height="20" rx="10" fill="#111827" stroke="rgba(255,255,255,0.1)" stroke-width="1" />
+  <text x="128" y="222" font-size="10" font-family="monospace" font-weight="bold" fill="#9ca3af" text-anchor="middle" letter-spacing="1.5">mWh</text>
+</svg>
+
