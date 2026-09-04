@@ -12,6 +12,7 @@ import { ModelsDevRegistryProvider } from "./providers/modelsDevProvider";
 import { Controller } from "./controller";
 import { rankQuotes, bestValueSlug } from "./core/ranking";
 import { mergedScores, resolveBundledScoresPath } from "./core/scores";
+import { resolveSlugArg } from "./core/rowView";
 import { NEURALWATT_URL } from "./providers/neuralwattProvider";
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -88,6 +89,15 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
     vscode.commands.registerCommand("neuraldash.openPricingPage", async () => {
       await vscode.env.openExternal(vscode.Uri.parse(NEURALWATT_URL));
+    }),
+    vscode.commands.registerCommand("neuraldash.copySlug", async (arg: unknown) => {
+      const slug = resolveSlugArg(arg);
+      if (!slug) {
+        void vscode.window.showInformationMessage("Copy Slug: use from a board row tooltip");
+        return;
+      }
+      await vscode.env.clipboard.writeText(slug);
+      vscode.window.setStatusBarMessage(`Copied slug: ${slug}`, 2000);
     }),
   );
 }

@@ -1,9 +1,11 @@
 import * as vscode from "vscode";
 import type { Snapshot, ValuedQuote, SortOrder } from "../core/types";
 import { costPer1kUsd, formatMwh } from "../core/energy";
-import { computeSeverityScale, basisToSvgUri, severityOf } from "../core/color";
+import { computeSeverityScale, basisToSvgUri } from "../core/color";
 import type { SeverityScale } from "../core/color";
 import type { RegistryModel } from "../core/flex";
+import { modelRowDescription, sparklineTooltipRow, tooltipFooter } from "../core/rowView";
+import { NEURALWATT_URL } from "../providers/neuralwattProvider";
 import { formatFlexDescription, formatContextTokens } from "../core/flex";
 
 export class FlexSectionItem extends vscode.TreeItem {
@@ -134,7 +136,10 @@ export class BoardTreeProvider implements vscode.TreeDataProvider<vscode.TreeIte
     if (m.last_updated) lines.push(`| Last updated | ${escapeMarkdown(m.last_updated)} |`);
     lines.push(`| Source | ${escapeMarkdown(this.registrySource)} |`);
     lines.push(`\n_Pricing from registry — no live energy data_`);
+    // Same sticky-hover footer as model rows; isTrusted required for the command: link.
+    lines.push(tooltipFooter(NEURALWATT_URL, m.slug));
     md.value = lines.join("\n");
+    md.isTrusted = true;
     item.tooltip = md;
     return item;
   }
@@ -182,11 +187,7 @@ export class BoardTreeProvider implements vscode.TreeDataProvider<vscode.TreeIte
 
     const mwh = v.descriptionMwh;
     const cost = costPer1kUsd(mwh, this.tariff);
-    if (mwh != null) {
-      item.description = `${formatMwh(mwh)} · $${(cost ?? 0).toFixed(2)}/1k`;
-    } else {
-      item.description = "-";
-    }
+    item.description = modelRowDescription(mwh, cost, v.quote.sparkline, v.quote.trend);
 
     if (isBest) {
       item.iconPath = new vscode.ThemeIcon("star-full");
@@ -198,7 +199,8 @@ export class BoardTreeProvider implements vscode.TreeDataProvider<vscode.TreeIte
     }
     item.contextValue = isBest ? "model.best" : v.quote.isPreview ? "model.preview" : "model";
 
-    // Tooltip: do NOT set isTrusted — external strings could contain markdown command links.
+    // Tooltip: isTrusted=true so the footer command: link is clickable (content is
+    // extension-assembled; only static + formatted numbers flow into it).
     const md = new vscode.MarkdownString(undefined, true);
     const headerBase = `**${escapeMarkdown(v.quote.displayName)}**  \n\`slug: ${escapeMarkdown(v.quote.slug)}\``;
     const lines: string[] = [];
@@ -218,6 +220,8 @@ export class BoardTreeProvider implements vscode.TreeDataProvider<vscode.TreeIte
       const arrow = v.quote.trend.direction === "above" ? "▲" : v.quote.trend.direction === "below" ? "▼" : "—";
       lines.push(`| Trend | ${arrow} ${v.quote.trend.pct}% ${escapeMarkdown(v.quote.trend.direction)} |`);
     }
+    const sparkRow = sparklineTooltipRow(v.quote.sparkline);
+    if (sparkRow) lines.push(sparkRow);
     if (v.quote.cachePct != null) lines.push(`| Cache | ${v.quote.cachePct}% |`);
     if (v.quote.contextBand) {
       lines.push(`| Context | ${escapeMarkdown(v.quote.contextBand)} |`);
@@ -238,7 +242,12 @@ export class BoardTreeProvider implements vscode.TreeDataProvider<vscode.TreeIte
       }
     }
     if (this.snapshot) lines.push(`\n_Last updated: ${escapeMarkdown(this.snapshot.fetchedAt)}_`);
+    // Footer link markers `](` flip the hover widget to interactive/sticky so the
+    // pointer can move into the tooltip; applied to every model row unconditionally.
+    // isTrusted is required for the command: link to be clickable.
+    lines.push(tooltipFooter(NEURALWATT_URL, v.quote.slug));
     md.value = lines.join("\n");
+    md.isTrusted = true;
     item.tooltip = md;
 
     item.command = undefined;

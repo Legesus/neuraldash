@@ -21,12 +21,17 @@ function syntheticBoardRow(opts: {
   preview?: boolean;
   contextBand?: string;
   cachePct?: number;
+  /** td[4] inner HTML override; default plain div (parses to sparkline null). */
+  spark?: string;
+  /** Drop the 5th td entirely (legacy-shape row). */
+  omitTd4?: boolean;
 }): string {
   const previewHtml = opts.preview ? `<a class="ml-2 bg-amber-100" title="${opts.name} is in preview">Preview</a>` : "";
   const ctx = opts.contextBand ?? "16k–64k";
   const cache = opts.cachePct != null ? ` &middot; ${opts.cachePct}% cache` : "";
   const small = `<div class="text-[10px] font-mono-data">${ctx}<span> ${cache}</span></div>`;
   const trend = opts.trendAria ? `<div role="img" aria-label="${opts.trendAria}"></div>` : `<div></div>`;
+  const td4 = opts.omitTd4 ? "" : `<td class="px-3 py-3">${opts.spark ?? "<div>48h sparkline</div>"}</td>`;
   return `
     <tr>
       <td class="px-4 py-3">
@@ -36,8 +41,42 @@ function syntheticBoardRow(opts: {
       <td class="px-3 py-3 text-right"><span class="num">${opts.rightNow ?? "—"}</span></td>
       <td class="px-3 py-3 text-right"><span class="num">${opts.typical ?? "—"}</span></td>
       <td class="px-3 py-3">${trend}</td>
-      <td class="px-3 py-3"><div>48h sparkline</div></td>
+      ${td4}
     </tr>`;
+}
+
+/** Builds td[4] inner HTML mimicking the live board's 48h sparkline cell. */
+function sparkTd(opts?: {
+  cls?: string;
+  /** Polyline point tokens; null => svg without polyline. Default 3 points. */
+  points?: string[] | null;
+  /** Reference line y1; "none" => no line element (refY null). Default 20.6. */
+  refY?: number | "none";
+  /** Label spans: default ["461.32 mWh","170.84 mWh"]; "none" => no label div; "one" => single span. */
+  labels?: [string, string] | "none" | "one";
+}): string {
+  const cls = opts?.cls ?? "flex-1  text-emerald-500";
+  const refY = opts?.refY === undefined ? 20.6 : opts.refY;
+  const lineHtml =
+    refY === "none"
+      ? ""
+      : `<line x1="0" y1="${refY}" x2="100" y2="${refY}" stroke="#9ca3af" stroke-width="1" stroke-dasharray="2,2" opacity="0.6"/>`;
+  const pts = opts?.points === undefined ? ["0.0,20.24", "2.13,22.16", "97.87,20.83"] : opts.points;
+  const polyHtml = pts == null ? "" : `<polyline points="${pts.join(" ")} "/>`;
+  const svg = `<svg viewBox="0 0 100 30" class="${cls}">${lineHtml}${polyHtml}</svg>`;
+  const labels = opts?.labels === undefined ? (["461.32 mWh", "170.84 mWh"] as [string, string]) : opts.labels;
+  let labelHtml: string;
+  if (labels === "none") labelHtml = "";
+  else if (labels === "one") labelHtml = `<div class="flex flex-col justify-between"><span>461.32 mWh</span></div>`;
+  else labelHtml = `<div class="flex flex-col justify-between"><span>${labels[0]}</span><span>${labels[1]}</span></div>`;
+  return `<div class="flex items-stretch">${svg}</div>${labelHtml}`;
+}
+
+/** Generates n evenly-spaced "x,y" tokens for point-count tests. */
+function nPoints(n: number): string[] {
+  const pts: string[] = [];
+  for (let i = 0; i < n; i++) pts.push(`${((i * 100) / (n - 1)).toFixed(2)},${(15 + i * 0.1).toFixed(2)}`);
+  return pts;
 }
 
 function syntheticGridRow(opts: {
@@ -304,5 +343,150 @@ describe("parse — synthetic edge cases", () => {
   it("throws ParseError when board has 0 data rows", () => {
     const html = wrapTwoTables("", syntheticGridRow({ name: "X", bands: ["1 mWh", null, null, null, null, null, null] }));
     assert.throws(() => parseSnapshot(html, sourceUrl), (e: unknown) => e instanceof ParseError);
+  });
+});
+
+describe("parse — sparkline (fixture)", () => {
+  it("parses all 14 fixture sparklines with 6 below / 7 above / 1 neutral", () => {
+    const snap = parseSnapshot(fixtureHtml(), sourceUrl);
+    assert.equal(snap.quotes.length, 14);
+    const counts = { below: 0, above: 0, neutral: 0 };
+    for (const q of snap.quotes) {
+      assert.ok(q.sparkline != null, `sparkline non-null for ${q.displayName}`);
+      counts[q.sparkline!.direction]++;
+    }
+    assert.deepEqual(counts, { below: 6, above: 7, neutral: 1 });
+  });
+
+  it("pins per-model direction expectations from the fixture", () => {
+    const snap = parseSnapshot(fixtureHtml(), sourceUrl);
+    const bySlug = Object.fromEntries(snap.quotes.map((q) => [q.slug, q.sparkline!.direction])) as Record<string, string>;
+    const expected: Record<string, string> = {
+      "deepseek-v4-flash": "neutral", // text-nw-moss dark:text-nw-envy
+      "deepseek-v4-pro": "above",
+      "gemma-4-31b": "above",
+      "glm-5.2": "above",
+      "glm-5.2-fast": "above",
+      "glm-5.2-short": "above",
+      "glm-5.2-short-fast": "below",
+      "kimi-k2.7-code": "below",
+      "kimi-k2.7-code-fast": "below",
+      "kimi-k3": "below",
+      "kimi-k3-fast": "below",
+      "qwen-3.8-27b": "above",
+      "qwen3.6-35b": "above",
+      "qwen3.6-35b-fast": "below",
+    };
+    for (const [slug, dir] of Object.entries(expected)) {
+      assert.equal(bySlug[slug], dir, `direction for ${slug}`);
+    }
+    // Include any key check that no models are missing from the pin list:
+    assert.equal(Object.keys(bySlug).length, Object.keys(expected).length, "all fixture slugs pinned");
+  });
+
+  it("parses the first sparkline exactly (47 points, refY, min/max)", () => {
+    const snap = parseSnapshot(fixtureHtml(), sourceUrl);
+    const flash = snap.quotes.find((q) => q.slug === "deepseek-v4-flash")!;
+    const sp = flash.sparkline!;
+    assert.equal(sp.points.length, 47);
+    assert.deepEqual(sp.points[0], { x: 0, y: 20.24 });
+    assert.deepEqual(sp.points[46], { x: 97.87, y: 20.83 });
+    assert.equal(sp.refY, 20.6);
+    assert.equal(sp.maxMwh, 461.32);
+    assert.equal(sp.minMwh, 170.84);
+    assert.equal(sp.direction, "neutral");
+  });
+
+  it("supports variable point counts (2, 8, 34 observed in fixture)", () => {
+    const snap = parseSnapshot(fixtureHtml(), sourceUrl);
+    const fast = snap.quotes.find((q) => q.slug === "kimi-k2.7-code-fast")!;
+    assert.equal(fast.sparkline!.points.length, 2);
+    const fast2 = snap.quotes.find((q) => q.slug === "kimi-k3-fast")!;
+    assert.equal(fast2.sparkline!.points.length, 8);
+    const code = snap.quotes.find((q) => q.slug === "kimi-k2.7-code")!;
+    assert.equal(code.sparkline!.points.length, 34);
+  });
+
+  it("normalizes Wh labels in fixture rows", () => {
+    const snap = parseSnapshot(fixtureHtml(), sourceUrl);
+    const pro = snap.quotes.find((q) => q.slug === "deepseek-v4-pro")!;
+    assert.equal(pro.sparkline!.maxMwh, 1890); // "1.89 Wh"
+    assert.equal(pro.sparkline!.minMwh, 841.12);
+  });
+});
+
+describe("parse — sparkline (synthetic)", () => {
+  function sparkQuote(name: string, opts?: { spark?: string; omitTd4?: boolean }): ReturnType<typeof parseSnapshot>["quotes"][number] {
+    const board = syntheticBoardRow({ name, rightNow: "10 mWh", ...opts });
+    const grid = syntheticGridRow({ name, bands: ["10 mWh", null, null, null, null, null, null] });
+    return parseSnapshot(wrapTwoTables(board, grid), sourceUrl).quotes[0];
+  }
+
+  it("maps svg class tokens to direction (emerald/rose/moss/classless)", () => {
+    assert.equal(sparkQuote("E", { spark: sparkTd({ cls: "flex-1  text-emerald-500" }) }).sparkline!.direction, "below");
+    assert.equal(sparkQuote("R", { spark: sparkTd({ cls: "flex-1  text-rose-500" }) }).sparkline!.direction, "above");
+    assert.equal(
+      sparkQuote("M", { spark: sparkTd({ cls: "flex-1  text-nw-moss dark:text-nw-envy" }) }).sparkline!.direction,
+      "neutral",
+    );
+    assert.equal(sparkQuote("C", { spark: sparkTd({ cls: "flex-1" }) }).sparkline!.direction, "neutral");
+  });
+
+  it("returns null when svg or polyline is missing", () => {
+    assert.equal(sparkQuote("S").sparkline, null); // default td4 = plain div
+    assert.equal(sparkQuote("P", { spark: sparkTd({ points: null }) }).sparkline, null); // svg without polyline
+  });
+
+  it("returns null when fewer than 2 valid points remain", () => {
+    assert.equal(sparkQuote("One", { spark: sparkTd({ points: ["5,10"] }) }).sparkline, null);
+    assert.equal(sparkQuote("None", { spark: sparkTd({ points: [] }) }).sparkline, null);
+    // garbage tokens skipped; a single surviving valid point still yields null
+    assert.equal(sparkQuote("Gar", { spark: sparkTd({ points: ["5,10", "oops", "1,2,3", "NaN,5"] }) }).sparkline, null);
+  });
+
+  it("skips garbage tokens but keeps valid ones", () => {
+    const q = sparkQuote("Mix", { spark: sparkTd({ points: ["0,1", "oops", "2,3", "1,2,3", "4,5"] }) });
+    assert.deepEqual(
+      q.sparkline!.points,
+      [
+        { x: 0, y: 1 },
+        { x: 2, y: 3 },
+        { x: 4, y: 5 },
+      ],
+    );
+  });
+
+  it("accepts 46 vs 48 points without complaint", () => {
+    assert.equal(sparkQuote("A", { spark: sparkTd({ points: nPoints(46) }) }).sparkline!.points.length, 46);
+    assert.equal(sparkQuote("B", { spark: sparkTd({ points: nPoints(48) }) }).sparkline!.points.length, 48);
+  });
+
+  it("keeps sparkline with null min/max when the label div is missing", () => {
+    const q = sparkQuote("NL", { spark: sparkTd({ labels: "none" }) });
+    assert.ok(q.sparkline != null);
+    assert.equal(q.sparkline!.maxMwh, null);
+    assert.equal(q.sparkline!.minMwh, null);
+  });
+
+  it("sets both min/max null when fewer than 2 label spans exist", () => {
+    const q = sparkQuote("OS", { spark: sparkTd({ labels: "one" }) });
+    assert.ok(q.sparkline != null);
+    assert.equal(q.sparkline!.maxMwh, null);
+    assert.equal(q.sparkline!.minMwh, null);
+  });
+
+  it('normalizes "2.59 Wh" labels to 2590 mWh', () => {
+    const q = sparkQuote("WH", { spark: sparkTd({ labels: ["2.59 Wh", "170.84 mWh"] }) });
+    assert.equal(q.sparkline!.maxMwh, 2590);
+    assert.equal(q.sparkline!.minMwh, 170.84);
+  });
+
+  it("returns null for a 4-td legacy row (no td[4])", () => {
+    assert.equal(sparkQuote("Legacy", { omitTd4: true }).sparkline, null);
+  });
+
+  it("parses refY from the line, null when the line is absent", () => {
+    assert.equal(sparkQuote("RL", { spark: sparkTd({}) }).sparkline!.refY, 20.6);
+    assert.equal(sparkQuote("RN", { spark: sparkTd({ refY: "none" }) }).sparkline!.refY, null);
   });
 });

@@ -18,6 +18,26 @@ export interface TrendInfo {
   direction: "inline" | "above" | "below";
 }
 
+export type SparklineDirection = "below" | "above" | "neutral";
+
+export interface SparklinePoint {
+  x: number;
+  y: number;
+}
+
+export interface Sparkline48h {
+  /** Polyline points in source 100x30 viewBox coords, oldest→latest. */
+  points: SparklinePoint[];
+  /** Dotted reference line y1 in source coords, null when absent/unparseable. */
+  refY: number | null;
+  /** svg class semantics: emerald=below avg, rose=above, moss/colorless=neutral. */
+  direction: SparklineDirection;
+  /** Top label via normalizeMwh (max), null when labels absent. */
+  maxMwh: number | null;
+  /** Bottom label via normalizeMwh (min), null when labels absent. */
+  minMwh: number | null;
+}
+
 export interface ModelQuote {
   displayName: string;
   slug: string;
@@ -27,6 +47,9 @@ export interface ModelQuote {
   rightNowMwh: number | null;
   typicalMwh: number | null;
   trend: TrendInfo | null;
+  // Optional (not required) so pre-existing ModelQuote literals keep compiling;
+  // old-cache JSON lacks the field entirely (undefined). Consumers truthy-check.
+  sparkline?: Sparkline48h | null;
   bands: BandEnergy[];
   capturedAt: string;
 }

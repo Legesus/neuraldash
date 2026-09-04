@@ -1,5 +1,5 @@
 import { parse, HTMLElement } from "node-html-parser";
-import { BandEnergy, BandKey, BAND_KEYS, ModelQuote, Snapshot, ParseError, TrendInfo } from "./types";
+import { BandEnergy, BandKey, BAND_KEYS, ModelQuote, Snapshot, ParseError, TrendInfo, Sparkline48h, SparklineDirection, SparklinePoint } from "./types";
 import { toSlug } from "./registry";
 import { normalizeMwh } from "./energy";
 
@@ -88,6 +88,51 @@ function isPreviewCell(cell: HTMLElement): boolean {
   }
   // Fallback: class hash probe
   return !!cell.querySelector("a[class*='bg-amber']") || cell.innerHTML.includes("bg-amber");
+}
+
+function extractSparkline(td: HTMLElement): Sparkline48h | null {
+  const svg = td.querySelector("svg");
+  if (!svg) return null;
+  const polyline = svg.querySelector("polyline[points]");
+  if (!polyline) return null;
+  const rawPoints = polyline.getAttribute("points") ?? "";
+  const points: SparklinePoint[] = [];
+  for (const token of rawPoints.split(/\s+/)) {
+    if (!token) continue; // trailing space in fixture yields an empty token
+    const m = token.match(/^(-?[\d.]+),(-?[\d.]+)$/);
+    if (!m) continue; // garbage tokens skipped
+    const x = parseFloat(m[1]);
+    const y = parseFloat(m[2]);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+    points.push({ x, y });
+  }
+  if (points.length < 2) return null;
+
+  let refY: number | null = null;
+  const line = svg.querySelector("line");
+  if (line) {
+    const y1 = parseFloat(line.getAttribute("y1") ?? "");
+    if (Number.isFinite(y1)) refY = y1;
+  }
+
+  const svgClass = svg.getAttribute("class") ?? "";
+  let direction: SparklineDirection = "neutral";
+  if (/\btext-emerald-500\b/.test(svgClass)) direction = "below";
+  else if (/\btext-rose-500\b/.test(svgClass)) direction = "above";
+
+  let maxMwh: number | null = null;
+  let minMwh: number | null = null;
+  const labelDiv = td.querySelector("div.flex.flex-col");
+  if (labelDiv) {
+    const spans = labelDiv.querySelectorAll("span");
+    if (spans.length >= 2) {
+      // Top span = max, bottom span = min; BOTH required else both stay null.
+      maxMwh = normalizeMwh(cleanText(spans[0]));
+      minMwh = normalizeMwh(cleanText(spans[1]));
+    }
+  }
+
+  return { points, refY, direction, maxMwh, minMwh };
 }
 
 function extractBoardRows(board: HTMLElement): Map<string, Partial<ModelQuote>> {
@@ -179,6 +224,9 @@ function extractBoardRows(board: HTMLElement): Map<string, Partial<ModelQuote>> 
 
     const slug = toSlug(displayName);
 
+    let sparkline: Sparkline48h | null = null;
+    if (cells.length >= 5) sparkline = extractSparkline(cells[4]);
+
     map.set(slug, {
       displayName,
       slug,
@@ -188,6 +236,7 @@ function extractBoardRows(board: HTMLElement): Map<string, Partial<ModelQuote>> 
       rightNowMwh,
       typicalMwh,
       trend,
+      sparkline,
     });
   }
 
@@ -326,6 +375,7 @@ export function parseSnapshot(html: string, sourceUrl: string, fetchedAt?: strin
       rightNowMwh: partial.rightNowMwh ?? null,
       typicalMwh: partial.typicalMwh ?? null,
       trend: partial.trend ?? null,
+      sparkline: partial.sparkline ?? null,
       bands,
       capturedAt: at,
     };

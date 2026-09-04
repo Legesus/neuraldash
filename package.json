@@ -3,7 +3,8 @@
   "displayName": "NeuralDash — Energy Board",
   "description": "Live NeuralWatt energy-per-request board with value ranking and status bar.",
   "publisher": "adamd",
-  "version": "0.3.0",
+  "version": "0.4.6",
+  "icon": "media/icon.png",
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -18,7 +19,8 @@
     "onCommand:neuraldash.sortByName",
     "onCommand:neuraldash.pickBestValue",
     "onCommand:neuraldash.setMyModel",
-    "onCommand:neuraldash.openPricingPage"
+    "onCommand:neuraldash.openPricingPage",
+    "onCommand:neuraldash.copySlug"
   ],
   "main": "./out/src/extension.js",
   "contributes": {
@@ -75,6 +77,11 @@
       {
         "command": "neuraldash.openPricingPage",
         "title": "Open Pricing Page",
+        "category": "NeuralDash"
+      },
+      {
+        "command": "neuraldash.copySlug",
+        "title": "NeuralDash: Copy Model Slug",
         "category": "NeuralDash"
       }
     ],
