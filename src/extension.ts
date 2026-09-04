@@ -5,6 +5,7 @@ import { BoardTreeProvider } from "./ui/treeProvider";
 import { StatusBarController } from "./ui/statusBar";
 import { pickBestValueQuickPick, pickMyModel } from "./ui/quickPicks";
 import { CacheManager, createVsCodeStorage } from "./core/cache";
+import { RegistryCacheManager } from "./core/registryCache";
 import { NeuralwattProvider } from "./providers/neuralwattProvider";
 import { ModelsDevRegistryProvider } from "./providers/modelsDevProvider";
 import { Controller } from "./controller";
@@ -24,6 +25,8 @@ export function activate(context: vscode.ExtensionContext): void {
   };
   const storage = createVsCodeStorage(storagePath, fsImpl as never);
   const cache = new CacheManager(storage);
+  const registryStorage = createVsCodeStorage(storagePath, fsImpl as never, "registry-cache.json");
+  const registryStore = new RegistryCacheManager(registryStorage as never);
 
   const tree = new BoardTreeProvider(context);
   const treeView = vscode.window.createTreeView("neuralwatt.board", {
@@ -34,7 +37,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const statusBar = new StatusBarController();
   context.subscriptions.push(treeView, statusBar as unknown as vscode.Disposable);
 
-  const controller = new Controller(context, provider, registryProvider, cache, tree, statusBar, treeView, context.extensionPath);
+  const controller = new Controller(context, provider, registryProvider, cache, registryStore, tree, statusBar, treeView, context.extensionPath);
   context.subscriptions.push({ dispose: () => controller.dispose() });
   void controller.activate();
 

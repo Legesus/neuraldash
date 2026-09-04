@@ -73,8 +73,9 @@ export class CacheManager {
 export function createVsCodeStorage(
   globalStorageUriFsPath: string,
   fsImpl: { readFile(p: string, enc: string): Promise<string>; writeFile(p: string, data: string): Promise<void>; mkdir(p: string, opts: { recursive: boolean }): Promise<void> },
+  fileName = "cache.json",
 ): CacheStorage {
-  const path = globalStorageUriFsPath + "/cache.json";
+  const path = globalStorageUriFsPath + "/" + fileName;
   return {
     async read(): Promise<CacheData | null> {
       try {

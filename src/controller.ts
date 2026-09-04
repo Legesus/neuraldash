@@ -8,6 +8,7 @@ import { mergedScores, resolveBundledScoresPath } from "./core/scores";
 import { loadModelsRegistry, flexTiers, resolveBundledRegistryPath } from "./core/flex";
 import type { RegistryModel } from "./core/flex";
 import { transformModelsDevRegistry } from "./core/registryTransform";
+import { RegistryCacheManager } from "./core/registryCache";
 import type { RegistryDataProvider } from "./providers/modelsDevProvider";
 import { NEURALWATT_URL } from "./providers/neuralwattProvider";
 
@@ -25,6 +26,7 @@ export class Controller {
     private readonly provider: DataProvider,
     private readonly registryProvider: RegistryDataProvider,
     private readonly cache: CacheManager,
+    private readonly registryStore: RegistryCacheManager,
     private readonly tree: BoardTreeProvider,
     private readonly statusBar: StatusBarController,
     private readonly treeView: vscode.TreeView<vscode.TreeItem>,
@@ -34,10 +36,19 @@ export class Controller {
   async activate(): Promise<void> {
     this.pollMin = this.readPollInterval();
 
-    // Load registry once (bundled fallback; live refresh follows per cycle)
+    // Load registry: bundled fallback first, then cached live wins (stale-first)
     const registryPath = resolveBundledRegistryPath(this.extensionRoot);
     this.registryCache = loadModelsRegistry(registryPath);
     this.registrySource = this.registryCache ? `bundled registry (${this.registryCache.generatedAt})` : "";
+    try {
+      const stored = await this.registryStore.load();
+      if (stored.registry) {
+        this.registryCache = stored.registry;
+        this.registrySource = `models.dev api.json (cached ${stored.lastSuccessAt ?? stored.lastCheckedAt ?? ""})`;
+      }
+    } catch {
+      // corrupt/unreadable registry cache -> bundled fallback stays
+    }
 
     // stale-first render
     const cached = await this.cache.load();
@@ -195,8 +206,13 @@ export class Controller {
     if (this.registryFetching) return;
     this.registryFetching = true;
     try {
-      // P1: no etag persistence yet (full 200 each cycle); P2 adds 304 handling.
-      const result = await this.registryProvider.fetchRegistry(null);
+      let etag: string | null = null;
+      try {
+        etag = (await this.registryStore.load()).etag;
+      } catch {
+        etag = null;
+      }
+      const result = await this.registryProvider.fetchRegistry(etag);
       if (result.status === "ok") {
         const transformed = transformModelsDevRegistry(result.json);
         // Transform-null: keep last-known, persist NOTHING (self-heal next cycle).
@@ -204,9 +220,20 @@ export class Controller {
         const fetchedAt = new Date().toISOString();
         this.registryCache = transformed;
         this.registrySource = `models.dev api.json (live, fetched ${fetchedAt})`;
+        try {
+          await this.registryStore.saveRegistry(transformed, result.etag);
+        } catch {
+          // persistence is best-effort; in-memory registry already applied
+        }
         await this.rerenderFlexFromCache();
+      } else if (result.status === "notModified") {
+        try {
+          await this.registryStore.saveNotModified();
+        } catch {
+          // best-effort
+        }
       }
-      // notModified (no etag sent yet) / blocked / error -> silent no-op
+      // blocked / error -> silent no-op
     } finally {
       this.registryFetching = false;
     }
