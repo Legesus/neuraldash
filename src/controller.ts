@@ -7,6 +7,8 @@ import { rankQuotes, bestValueSlug } from "./core/ranking";
 import { mergedScores, resolveBundledScoresPath } from "./core/scores";
 import { loadModelsRegistry, flexTiers, resolveBundledRegistryPath } from "./core/flex";
 import type { RegistryModel } from "./core/flex";
+import { transformModelsDevRegistry } from "./core/registryTransform";
+import type { RegistryDataProvider } from "./providers/modelsDevProvider";
 import { NEURALWATT_URL } from "./providers/neuralwattProvider";
 
 export class Controller {
@@ -16,10 +18,12 @@ export class Controller {
   private isFetching = false;
   private registryCache: import("./core/flex").ModelsRegistry | null = null;
   private registrySource = "";
+  private registryFetching = false;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
     private readonly provider: DataProvider,
+    private readonly registryProvider: RegistryDataProvider,
     private readonly cache: CacheManager,
     private readonly tree: BoardTreeProvider,
     private readonly statusBar: StatusBarController,
@@ -30,10 +34,10 @@ export class Controller {
   async activate(): Promise<void> {
     this.pollMin = this.readPollInterval();
 
-    // Load registry once
+    // Load registry once (bundled fallback; live refresh follows per cycle)
     const registryPath = resolveBundledRegistryPath(this.extensionRoot);
     this.registryCache = loadModelsRegistry(registryPath);
-    this.registrySource = this.registryCache?.source ?? "";
+    this.registrySource = this.registryCache ? `bundled registry (${this.registryCache.generatedAt})` : "";
 
     // stale-first render
     const cached = await this.cache.load();
@@ -130,6 +134,8 @@ export class Controller {
     if (this.isFetching) return;
     this.isFetching = true;
     try {
+      // Registry refresh rides the board cycle but never blocks it.
+      void this.refreshRegistry();
       const cached = await this.cache.load();
       const etag = cached.etag;
       const result = await this.provider.fetchSnapshot(etag);
@@ -178,5 +184,44 @@ export class Controller {
 
   dispose(): void {
     if (this.timer) clearTimeout(this.timer);
+  }
+
+  /**
+   * Live registry refresh — fire-and-forget from fetchAndRender.
+   * Silent on all failures (never touches treeView.message, backoff, or
+   * scheduling); keeps last-known registry on any non-ok outcome.
+   */
+  private async refreshRegistry(): Promise<void> {
+    if (this.registryFetching) return;
+    this.registryFetching = true;
+    try {
+      // P1: no etag persistence yet (full 200 each cycle); P2 adds 304 handling.
+      const result = await this.registryProvider.fetchRegistry(null);
+      if (result.status === "ok") {
+        const transformed = transformModelsDevRegistry(result.json);
+        // Transform-null: keep last-known, persist NOTHING (self-heal next cycle).
+        if (!transformed) return;
+        const fetchedAt = new Date().toISOString();
+        this.registryCache = transformed;
+        this.registrySource = `models.dev api.json (live, fetched ${fetchedAt})`;
+        await this.rerenderFlexFromCache();
+      }
+      // notModified (no etag sent yet) / blocked / error -> silent no-op
+    } finally {
+      this.registryFetching = false;
+    }
+  }
+
+  /**
+   * Re-render the flex section from the board cache so a late-arriving live
+   * registry updates the view without disturbing board state.
+   */
+  private async rerenderFlexFromCache(): Promise<void> {
+    try {
+      const cached = await this.cache.load();
+      if (cached.snapshot) this.render(cached.snapshot);
+    } catch {
+      // render path already null-safe; never let the registry break the board
+    }
   }
 }

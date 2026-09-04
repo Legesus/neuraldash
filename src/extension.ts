@@ -6,6 +6,7 @@ import { StatusBarController } from "./ui/statusBar";
 import { pickBestValueQuickPick, pickMyModel } from "./ui/quickPicks";
 import { CacheManager, createVsCodeStorage } from "./core/cache";
 import { NeuralwattProvider } from "./providers/neuralwattProvider";
+import { ModelsDevRegistryProvider } from "./providers/modelsDevProvider";
 import { Controller } from "./controller";
 import { rankQuotes, bestValueSlug } from "./core/ranking";
 import { mergedScores, resolveBundledScoresPath } from "./core/scores";
@@ -13,6 +14,7 @@ import { NEURALWATT_URL } from "./providers/neuralwattProvider";
 
 export function activate(context: vscode.ExtensionContext): void {
   const provider = new NeuralwattProvider();
+  const registryProvider = new ModelsDevRegistryProvider();
 
   const storagePath = context.globalStorageUri.fsPath;
   const fsImpl = {
@@ -32,7 +34,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const statusBar = new StatusBarController();
   context.subscriptions.push(treeView, statusBar as unknown as vscode.Disposable);
 
-  const controller = new Controller(context, provider, cache, tree, statusBar, treeView, context.extensionPath);
+  const controller = new Controller(context, provider, registryProvider, cache, tree, statusBar, treeView, context.extensionPath);
   context.subscriptions.push({ dispose: () => controller.dispose() });
   void controller.activate();
 

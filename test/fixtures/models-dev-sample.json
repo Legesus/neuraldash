@@ -1,0 +1,77 @@
+{
+  "neuralwatt": {
+    "id": "neuralwatt",
+    "name": "Neuralwatt",
+    "models": {
+      "glm-5.2-flex": {
+        "id": "glm-5.2-flex",
+        "name": "GLM 5.2 Flex",
+        "description": "Flagship GLM model flex tier",
+        "family": "glm",
+        "limit": { "context": 199984, "output": 32000 },
+        "cost": { "input": 0.9, "output": 2.8, "cache_read": 0.09 },
+        "last_updated": "2026-06-17"
+      },
+      "glm-5.2-short-fast-flex": {
+        "id": "glm-5.2-short-fast-flex",
+        "name": "GLM 5.2 Short Fast Flex",
+        "description": null,
+        "family": null,
+        "limit": { "context": 199984, "output": 32000 },
+        "cost": { "input": 0.9425, "output": 2.925, "cache_read": 0.09425 },
+        "last_updated": null
+      },
+      "qwen-3.8-27b": {
+        "id": "qwen-3.8-27b",
+        "name": "Qwen3.8 27B",
+        "description": "Qwen model",
+        "family": "qwen",
+        "limit": { "context": 262128, "output": 32000 },
+        "cost": { "input": 0.45, "output": 3.2, "cache_read": 0.25 },
+        "last_updated": "2026-08-14"
+      },
+      "glm-5.3": {
+        "id": "glm-5.3",
+        "name": "GLM 5.3",
+        "description": "Next-gen GLM",
+        "family": "glm",
+        "status": "beta",
+        "limit": { "context": 1048560, "output": 128000 },
+        "cost": { "input": 1.45, "output": 4.5, "cache_read": 0.145 },
+        "last_updated": "2026-08-14"
+      },
+      "kimi-k2.7-code": {
+        "id": "kimi-k2.7-code",
+        "name": "Kimi K2.7 Code",
+        "description": "Kimi coding model",
+        "family": "kimi",
+        "limit": { "context": 262144, "output": 32000 },
+        "last_updated": "2026-05-01"
+      },
+      "deepseek-v4-flash": {
+        "id": "deepseek-v4-flash",
+        "name": "DeepSeek V4 Flash",
+        "description": "DeepSeek flash model",
+        "family": "deepseek",
+        "limit": { "context": 131072, "output": 32000 },
+        "cost": { "input": "free", "output": 1.0, "cache_read": null },
+        "last_updated": "2026-03-01"
+      }
+    }
+  },
+  "openai": {
+    "id": "openai",
+    "name": "OpenAI",
+    "models": {
+      "decoy-flex": {
+        "id": "decoy-flex",
+        "name": "Decoy Flex",
+        "description": "must be ignored by the neuralwatt-only transform",
+        "family": "decoy",
+        "limit": { "context": 128000, "output": 16000 },
+        "cost": { "input": 0.01, "output": 0.02, "cache_read": 0.001 },
+        "last_updated": "2026-01-01"
+      }
+    }
+  }
+}
