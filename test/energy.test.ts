@@ -50,6 +50,19 @@ describe("energy.cost helpers", () => {
   });
 });
 
+describe("energy.formatMwh", () => {
+  it("formats sub-1000 values as mWh with 2 decimals", () => {
+    assert.equal(formatMwh(999.99), "999.99 mWh");
+    assert.equal(formatMwh(0), "0.00 mWh");
+  });
+  it("formats values >= 1000 as Wh with 2 decimals", () => {
+    assert.equal(formatMwh(1000), "1.00 Wh");
+    assert.equal(formatMwh(1920), "1.92 Wh");
+  });
+  it("formats null as dash", () => {
+    assert.equal(formatMwh(null), "-");
+  });
+});
 describe("energy.humanizeAge", () => {
   it("just now <60s", () => {
     const now = new Date("2026-08-28T12:00:30.000Z");

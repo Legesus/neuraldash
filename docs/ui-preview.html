@@ -104,7 +104,7 @@
 </head>
 <body>
 
-<h1>NeuralDash v0.2.0 — how it looks inside VS Code</h1>
+<h1>NeuralDash v0.2.1 — how it looks inside VS Code</h1>
 <div class="sub">Rendered with <b>real data</b> from portal.neuralwatt.com/energy-pricing (2026-08-28, tariff $10/kWh · 1 mWh ≈ 1¢ per 1k requests). Row icons use a <b>severity color scale</b> (cheap→green <code>hsl(130,85%,55%)</code>, mid→yellow <code>hsl(60,45%,55%)</code>, expensive→red <code>hsl(0,85%,55%)</code>) computed over log(7-day typical) energy; flex variants below come from <b>data/models-registry.json</b> pricing.</div>
 
 <!-- ================= WINDOW 1 : board + tooltip ================= -->
@@ -165,7 +165,7 @@
         <tr><td>Value</td><td class="nb">no benchmark</td></tr>
       </table>
       <table>
-        <tr><th>Band</th><th>mWh</th><th>Share</th></tr>
+        <tr><th>Band</th><th>Energy</th><th>Share</th></tr>
         <tr><td>0-256</td><td>54.55</td><td>9.3%</td></tr>
         <tr><td>256-1k</td><td>64.93</td><td>27.2%</td></tr>
         <tr><td>1k-4k</td><td>25.48</td><td>18.4%</td></tr>
@@ -180,7 +180,7 @@
   <div class="statusbar">
     <div class="sitem"><svg viewBox="0 0 16 16"><circle cx="4" cy="3.5" r="1.5"/><circle cx="4" cy="12.5" r="1.5"/><circle cx="11" cy="6" r="1.5"/><path d="M4 5v6M11 7.5C11 10 7.5 9.6 5.5 10.6"/></svg> main*</div>
     <div class="sitem">&#x2716; 0 &nbsp;&#x26A0; 0</div>
-    <div class="sitem pushright mymodel"><svg class="zap" viewBox="0 0 16 16"><path d="M9.5 1 3.5 9.2h3.4L6 15l6.5-8.2H9.1L9.5 1z"/></svg> DeepSeek V4 Flash &middot; 214.3 mWh &middot; $2.14/1k</div>
+    <div class="sitem pushright mymodel"><svg class="zap" viewBox="0 0 16 16"><path d="M9.5 1 3.5 9.2h3.4L6 15l6.5-8.2H9.1L9.5 1z"/></svg> DeepSeek V4 Flash &middot; 214.30 mWh &middot; $2.14/1k</div>
     <div class="sitem">Ln 42, Col 17</div>
     <div class="sitem">Spaces: 2</div>
     <div class="sitem">UTF-8</div>
@@ -215,7 +215,7 @@
     </div>
   </div>
   <div class="statusbar">
-    <div class="sitem pushright mymodel"><svg class="zap" viewBox="0 0 16 16"><path d="M9.5 1 3.5 9.2h3.4L6 15l6.5-8.2H9.1L9.5 1z"/></svg> DeepSeek V4 Flash &middot; 214.3 mWh &middot; $2.14/1k</div>
+    <div class="sitem pushright mymodel"><svg class="zap" viewBox="0 0 16 16"><path d="M9.5 1 3.5 9.2h3.4L6 15l6.5-8.2H9.1L9.5 1z"/></svg> DeepSeek V4 Flash &middot; 214.30 mWh &middot; $2.14/1k</div>
   </div>
 </div>
 <div class="caption"><b>2.</b> <b>&ldquo;NeuralDash: Pick best-value model&rdquo;</b> quick pick (this is the real item format). Sorted by value score, energy-only models after &mdash; exactly what you see today while <code>data/scores.json</code> is empty. The two buttons on each row copy the slug / models.dev ID to the clipboard. Once you seed real benchmark scores, rows gain a <b>score&nbsp;NN/100</b> in the description, a <b>value 0.xxxx</b> detail, and the board&rsquo;s best model gets a &#9733; star icon.</div>
@@ -278,20 +278,20 @@
   ];
   const greySvg = zapSvg("#808080");
   const rows = [
-    ["Qwen3.6 35B",            false, "120.4 mWh · $1.20/1k"],
-    ["Qwen3.6 35B Fast",       false, "21.0 mWh · $0.21/1k"],
-    ["Gemma 4 31B",            false, "68.7 mWh · $0.69/1k"],
-    ["Qwen 3.8 27B",           true,  "184.9 mWh · $1.85/1k"],
-    ["DeepSeek V4 Flash",      false, "214.3 mWh · $2.14/1k"],
-    ["Kimi K2.7 Code Fast",    false, "144.7 mWh · $1.45/1k"],
-    ["Kimi K2.7 Code",         false, "757.9 mWh · $7.58/1k"],
-    ["GLM-5.2 (short, fast)",  false, "953.8 mWh · $9.54/1k"],
-    ["GLM-5.2 (fast)",         false, "550.7 mWh · $5.51/1k"],
-    ["GLM-5.2 (short)",        false, "966.1 mWh · $9.66/1k"],
-    ["DeepSeek V4-Pro",        true,  "1920.0 mWh · $19.20/1k"],
-    ["Kimi K3 Fast",           false, "1430.0 mWh · $14.30/1k"],
-    ["GLM-5.2",                false, "1870.0 mWh · $18.70/1k"],
-    ["Kimi K3",                false, "1700.0 mWh · $17.00/1k"],
+    ["Qwen3.6 35B",            false, "120.40 mWh · $1.20/1k"],
+    ["Qwen3.6 35B Fast",       false, "21.00 mWh · $0.21/1k"],
+    ["Gemma 4 31B",            false, "68.70 mWh · $0.69/1k"],
+    ["Qwen 3.8 27B",           true,  "184.90 mWh · $1.85/1k"],
+    ["DeepSeek V4 Flash",      false, "214.30 mWh · $2.14/1k"],
+    ["Kimi K2.7 Code Fast",    false, "144.70 mWh · $1.45/1k"],
+    ["Kimi K2.7 Code",         false, "757.90 mWh · $7.58/1k"],
+    ["GLM-5.2 (short, fast)",  false, "953.80 mWh · $9.54/1k"],
+    ["GLM-5.2 (fast)",         false, "550.70 mWh · $5.51/1k"],
+    ["GLM-5.2 (short)",        false, "966.10 mWh · $9.66/1k"],
+    ["DeepSeek V4-Pro",        true,  "1.92 Wh · $19.20/1k"],
+    ["Kimi K3 Fast",           false, "1.43 Wh · $14.30/1k"],
+    ["GLM-5.2",                false, "1.87 Wh · $18.70/1k"],
+    ["Kimi K3",                false, "1.70 Wh · $17.00/1k"],
   ];
   function boardHTML(){
     const boardRows = rows.map((r,i) => {

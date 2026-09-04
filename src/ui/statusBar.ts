@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import type { ValuedQuote } from "../core/types";
+import { formatMwh } from "../core/energy";
 
 export class StatusBarController {
   private item: vscode.StatusBarItem;
@@ -23,8 +24,8 @@ export class StatusBarController {
     const mwh = match.descriptionMwh;
     const cost = match.costPer1kUsd;
     const costStr = cost != null ? `$${cost.toFixed(2)}/1k` : "-";
-    this.item.text = `$(zap) ${match.quote.displayName} · ${mwh.toFixed(1)} mWh · ${costStr}`;
-    this.item.tooltip = `${match.quote.displayName} — ${mwh.toFixed(2)} mWh (${costStr})`;
+    this.item.text = `$(zap) ${match.quote.displayName} · ${formatMwh(mwh)} · ${costStr}`;
+    this.item.tooltip = `${match.quote.displayName} — ${formatMwh(mwh)} (${costStr})`;
     this.item.show();
   }
 

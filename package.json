@@ -3,7 +3,7 @@
   "displayName": "NeuralDash — Energy Board",
   "description": "Live NeuralWatt energy-per-request board with value ranking and status bar.",
   "publisher": "adamd",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "engines": {
     "vscode": "^1.85.0"
   },

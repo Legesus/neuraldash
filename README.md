@@ -7,7 +7,7 @@ Live NeuralWatt **energy-per-request** board inside VS Code. Shows `Right now` a
 - Tree view `NeuralWatt` → `Energy Board` lists all models with energy and cost per 1k requests.
 - Tooltips with full per-band table, trend, cache hit %, and benchmark value.
 - Value ranking: `value = performanceScore / basisMwh` (basis from `preferredBand`).
-- Status bar — pins your chosen model (`neuraldash.myModel`) as `⚡ <name> · 245.5 mWh · $2.45/1k`.
+- Status bar — pins your chosen model (`neuraldash.myModel`) as `⚡ <name> · 245.48 mWh · $2.45/1k`.
 - Polling with ETag / `If-None-Match`, 30s timeout, failure backoff (cap 120 min).
 
 ## Configuration

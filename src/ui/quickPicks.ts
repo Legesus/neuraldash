@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import type { ValuedQuote } from "../core/types";
+import { formatMwh } from "../core/energy";
 
 export async function pickBestValueQuickPick(valued: ValuedQuote[]): Promise<void> {
   const sorted = [...valued].sort((a, b) => {
@@ -23,7 +24,7 @@ export async function pickBestValueQuickPick(valued: ValuedQuote[]): Promise<voi
 
   const items: (vscode.QuickPickItem & { slug: string; modelId?: string })[] = sorted.map((v) => ({
     label: `${v.quote.displayName}`,
-    description: v.basisMwh != null ? `${v.basisMwh.toFixed(1)} mWh` : "—",
+    description: v.basisMwh != null ? formatMwh(v.basisMwh) : "—",
     detail: v.value != null ? `value ${v.value.toFixed(4)}` : "no benchmark",
     slug: v.quote.slug,
     buttons: [

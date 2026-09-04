@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import type { Snapshot, ValuedQuote, SortOrder } from "../core/types";
-import { costPer1kUsd } from "../core/energy";
+import { costPer1kUsd, formatMwh } from "../core/energy";
 import { computeSeverityScale, basisToSvgUri, severityOf } from "../core/color";
 import type { SeverityScale } from "../core/color";
 import type { RegistryModel } from "../core/flex";
@@ -183,7 +183,7 @@ export class BoardTreeProvider implements vscode.TreeDataProvider<vscode.TreeIte
     const mwh = v.descriptionMwh;
     const cost = costPer1kUsd(mwh, this.tariff);
     if (mwh != null) {
-      item.description = `${mwh.toFixed(1)} mWh · $${(cost ?? 0).toFixed(2)}/1k`;
+      item.description = `${formatMwh(mwh)} · $${(cost ?? 0).toFixed(2)}/1k`;
     } else {
       item.description = "-";
     }
@@ -207,9 +207,9 @@ export class BoardTreeProvider implements vscode.TreeDataProvider<vscode.TreeIte
     lines.push("");
     lines.push(`| Field | Value |`);
     lines.push(`|---|---|`);
-    const rightNowStr = v.quote.rightNowMwh != null ? `${v.quote.rightNowMwh.toFixed(2)} mWh` : "-";
-    const typicalStr = v.quote.typicalMwh != null ? `${v.quote.typicalMwh.toFixed(2)} mWh` : "-";
-    const basisStr = v.basisMwh != null ? `${v.basisMwh.toFixed(2)} mWh` : "—";
+    const rightNowStr = formatMwh(v.quote.rightNowMwh);
+    const typicalStr = formatMwh(v.quote.typicalMwh);
+    const basisStr = v.basisMwh != null ? formatMwh(v.basisMwh) : "—";
     lines.push(`| Right now | ${rightNowStr} |`);
     lines.push(`| Typical (7d) | ${typicalStr} |`);
     lines.push(`| Basis | ${basisStr} |`);
@@ -229,10 +229,10 @@ export class BoardTreeProvider implements vscode.TreeDataProvider<vscode.TreeIte
     else lines.push(`| Value | no benchmark |`);
     if (v.quote.bands.length > 0) {
       lines.push("");
-      lines.push(`| Band | mWh | Share |`);
+      lines.push(`| Band | Energy | Share |`);
       lines.push(`|---|---|---|`);
       for (const b of v.quote.bands) {
-        const m = b.mwh != null ? `${b.mwh.toFixed(2)}` : "—";
+        const m = b.mwh != null ? formatMwh(b.mwh) : "—";
         const s = b.sharePct != null ? `${b.sharePct.toFixed(1)}%` : "—";
         lines.push(`| ${escapeMarkdown(b.band)} | ${m} | ${s} |`);
       }
