@@ -1,14 +1,20 @@
 # NeuralDash — Energy Board
 
-Live NeuralWatt **energy-per-request** board inside VS Code. Shows `Right now` and `7-day typical` energy, per-size breakdowns, and a value ranking (`performanceScore / mWh`) with status-bar pinning.
+Live NeuralWatt **energy-per-request** board inside VS Code. Shows `Right now` and `7-day typical` energy, per-size breakdowns, 48-hour trend charts, and a value ranking (`performanceScore / mWh`) with status-bar pinning.
+
+<!-- Preview screenshot lives at docs/prototype-48h-trend.png — re-enable this image once the project has a public repository URL (vsce resolves README images against it). -->
 
 ## Features
 
 - Tree view `NeuralWatt` → `Energy Board` lists all models with energy and cost per 1k requests.
-- Tooltips with full per-band table, trend, cache hit %, and benchmark value.
+- **48h trend chart** — right-click a model row (or use the tooltip link) to open a chart panel rendering the full 48-hour trendline with reference line and trend coloring.
+- Rich, sticky tooltips: full per-band table, colored 48h trend summary, cache hit %, benchmark value, plus `Copy Slug` and `Open Pricing Page` actions.
 - Value ranking: `value = performanceScore / basisMwh` (basis from `preferredBand`).
 - Status bar — pins your chosen model (`neuraldash.myModel`) as `⚡ <name> · 245.48 mWh · $2.45/1k`.
+- Flex tiers — live registry pricing for `-flex` variants not on the live board.
 - Polling with ETag / `If-None-Match`, 30s timeout, failure backoff (cap 120 min).
+
+> **Note:** NeuralDash is unofficial and reads the public NeuralWatt energy-pricing page directly (no API). If the page's structure changes, parsing may need an update — the board keeps serving its last cached data meanwhile.
 
 ## Configuration
 
@@ -43,6 +49,8 @@ Live NeuralWatt **energy-per-request** board inside VS Code. Shows `Right now` a
 - `Sort by Energy` / `Sort by Value` / `Sort by Name`
 - `Pick Best Value`
 - `Set My Model`
+- `Open 48h Trend Chart` (also via row right-click and the tooltip link)
+- `Copy Model Slug` (via the tooltip link)
 - `Open Pricing Page`
 
 ## Flex tiers (live registry)

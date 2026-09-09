@@ -10,3 +10,8 @@ tmp_models_dev_api.json
 .codegraph/**
 **/*.map
 **/*.ts
+
+# design scratch + local artifacts (never ship)
+media/concept-*.svg
+.prototype-png/**
+*.log
