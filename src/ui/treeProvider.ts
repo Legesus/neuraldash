@@ -1,10 +1,10 @@
 import * as vscode from "vscode";
 import type { Snapshot, ValuedQuote, SortOrder } from "../core/types";
-import { costPer1kUsd, formatMwh } from "../core/energy";
+import { costPer1kUsd } from "../core/energy";
 import { computeSeverityScale, basisToSvgUri } from "../core/color";
 import type { SeverityScale } from "../core/color";
 import type { RegistryModel } from "../core/flex";
-import { modelRowDescription, sparklineTooltipRow, tooltipFooter } from "../core/rowView";
+import { modelRowDescription, tooltipFooter, buildModelTooltipMd, escapeMarkdownLocal } from "../core/rowView";
 import { NEURALWATT_URL } from "../providers/neuralwattProvider";
 import { formatFlexDescription, formatContextTokens } from "../core/flex";
 
@@ -87,6 +87,17 @@ export class BoardTreeProvider implements vscode.TreeDataProvider<vscode.TreeIte
     return this.sortOrder;
   }
 
+  /** Current board state for diagnostics (e.g. `neuraldash.debugTooltip`). */
+  getBoardData(): BoardSnapshotData {
+    return {
+      snapshot: this.snapshot,
+      valued: this.valued,
+      bestSlug: this.bestSlug,
+      tariff: this.tariff,
+      registrySource: this.registrySource,
+    };
+  }
+
   getTreeItem(element: vscode.TreeItem): vscode.TreeItem {
     return element;
   }
@@ -122,19 +133,19 @@ export class BoardTreeProvider implements vscode.TreeDataProvider<vscode.TreeIte
 
     const md = new vscode.MarkdownString(undefined, true);
     const lines: string[] = [];
-    lines.push(`**${escapeMarkdown(m.name)}**  \n\`slug: ${escapeMarkdown(m.slug)}\``);
+    lines.push(`**${escapeMarkdownLocal(m.name)}**  \n\`slug: ${escapeMarkdownLocal(m.slug)}\``);
     lines.push("");
     lines.push(`| Field | Value |`);
     lines.push(`|---|---|`);
-    lines.push(`| Provider | ${escapeMarkdown(m.provider)} |`);
-    lines.push(`| Family | ${escapeMarkdown(m.family ?? "-")} |`);
-    lines.push(`| Context | ${escapeMarkdown(formatContextTokens(m.context))} tokens |`);
-    lines.push(`| Input | $${escapeMarkdown(m.cost.input.toFixed(2))} /1M tok |`);
-    lines.push(`| Output | $${escapeMarkdown(m.cost.output.toFixed(2))} /1M tok |`);
-    if (m.cost.cache_read != null) lines.push(`| Cache read | $${escapeMarkdown(m.cost.cache_read.toFixed(3))} |`);
-    if (m.description) lines.push(`| Description | ${escapeMarkdown(m.description)} |`);
-    if (m.last_updated) lines.push(`| Last updated | ${escapeMarkdown(m.last_updated)} |`);
-    lines.push(`| Source | ${escapeMarkdown(this.registrySource)} |`);
+    lines.push(`| Provider | ${escapeMarkdownLocal(m.provider)} |`);
+    lines.push(`| Family | ${escapeMarkdownLocal(m.family ?? "-")} |`);
+    lines.push(`| Context | ${escapeMarkdownLocal(formatContextTokens(m.context))} tokens |`);
+    lines.push(`| Input | $${escapeMarkdownLocal(m.cost.input.toFixed(2))} /1M tok |`);
+    lines.push(`| Output | $${escapeMarkdownLocal(m.cost.output.toFixed(2))} /1M tok |`);
+    if (m.cost.cache_read != null) lines.push(`| Cache read | $${escapeMarkdownLocal(m.cost.cache_read.toFixed(3))} |`);
+    if (m.description) lines.push(`| Description | ${escapeMarkdownLocal(m.description)} |`);
+    if (m.last_updated) lines.push(`| Last updated | ${escapeMarkdownLocal(m.last_updated)} |`);
+    lines.push(`| Source | ${escapeMarkdownLocal(this.registrySource)} |`);
     lines.push(`\n_Pricing from registry — no live energy data_`);
     // Same sticky-hover footer as model rows; isTrusted required for the command: link.
     lines.push(tooltipFooter(NEURALWATT_URL, m.slug));
@@ -184,6 +195,10 @@ export class BoardTreeProvider implements vscode.TreeDataProvider<vscode.TreeIte
     const label = v.quote.displayName + (v.quote.isPreview ? " (preview)" : "");
     const isBest = this.bestSlug != null && v.quote.slug === this.bestSlug;
     const item = new vscode.TreeItem(label, vscode.TreeItemCollapsibleState.None);
+    // Slug identity: the openModelChart context-menu / inline invocation
+    // passes the TreeItem; its core-serialized string `id` is the lookup key
+    // (also improves VS Code identity/selection persistence across refreshes).
+    item.id = v.quote.slug;
 
     const mwh = v.descriptionMwh;
     const cost = costPer1kUsd(mwh, this.tariff);
@@ -201,52 +216,16 @@ export class BoardTreeProvider implements vscode.TreeDataProvider<vscode.TreeIte
 
     // Tooltip: isTrusted=true so the footer command: link is clickable (content is
     // extension-assembled; only static + formatted numbers flow into it).
-    const md = new vscode.MarkdownString(undefined, true);
-    const headerBase = `**${escapeMarkdown(v.quote.displayName)}**  \n\`slug: ${escapeMarkdown(v.quote.slug)}\``;
-    const lines: string[] = [];
-    lines.push(headerBase);
-    if (isBest) lines.push(`\n$(star-full) **Best value**`);
-    lines.push("");
-    lines.push(`| Field | Value |`);
-    lines.push(`|---|---|`);
-    const rightNowStr = formatMwh(v.quote.rightNowMwh);
-    const typicalStr = formatMwh(v.quote.typicalMwh);
-    const basisStr = v.basisMwh != null ? formatMwh(v.basisMwh) : "—";
-    lines.push(`| Right now | ${rightNowStr} |`);
-    lines.push(`| Typical (7d) | ${typicalStr} |`);
-    lines.push(`| Basis | ${basisStr} |`);
-    if (cost != null && mwh != null) lines.push(`| Cost/1k | $${cost.toFixed(2)} |`);
-    if (v.quote.trend) {
-      const arrow = v.quote.trend.direction === "above" ? "▲" : v.quote.trend.direction === "below" ? "▼" : "—";
-      lines.push(`| Trend | ${arrow} ${v.quote.trend.pct}% ${escapeMarkdown(v.quote.trend.direction)} |`);
-    }
-    const sparkRow = sparklineTooltipRow(v.quote.sparkline);
-    if (sparkRow) lines.push(sparkRow);
-    if (v.quote.cachePct != null) lines.push(`| Cache | ${v.quote.cachePct}% |`);
-    if (v.quote.contextBand) {
-      lines.push(`| Context | ${escapeMarkdown(v.quote.contextBand)} |`);
-    }
-    if (v.score) {
-      lines.push(`| Score | ${v.score.performanceScore} (${escapeMarkdown(v.score.source)}) |`);
-    }
-    if (v.value != null) lines.push(`| Value | ${v.value.toFixed(4)} (score/mWh) |`);
-    else lines.push(`| Value | no benchmark |`);
-    if (v.quote.bands.length > 0) {
-      lines.push("");
-      lines.push(`| Band | Energy | Share |`);
-      lines.push(`|---|---|---|`);
-      for (const b of v.quote.bands) {
-        const m = b.mwh != null ? formatMwh(b.mwh) : "—";
-        const s = b.sharePct != null ? `${b.sharePct.toFixed(1)}%` : "—";
-        lines.push(`| ${escapeMarkdown(b.band)} | ${m} | ${s} |`);
-      }
-    }
-    if (this.snapshot) lines.push(`\n_Last updated: ${escapeMarkdown(this.snapshot.fetchedAt)}_`);
     // Footer link markers `](` flip the hover widget to interactive/sticky so the
     // pointer can move into the tooltip; applied to every model row unconditionally.
     // isTrusted is required for the command: link to be clickable.
-    lines.push(tooltipFooter(NEURALWATT_URL, v.quote.slug));
-    md.value = lines.join("\n");
+    const md = new vscode.MarkdownString(undefined, true);
+    md.value = buildModelTooltipMd(v, {
+      fetchedAt: this.snapshot ? this.snapshot.fetchedAt : null,
+      isBest,
+      pricingUrl: NEURALWATT_URL,
+      tariff: this.tariff,
+    });
     md.isTrusted = true;
     item.tooltip = md;
 
@@ -256,6 +235,14 @@ export class BoardTreeProvider implements vscode.TreeDataProvider<vscode.TreeIte
   }
 }
 
-function escapeMarkdown(text: string): string {
-  return text.replace(/\\/g, "\\\\").replace(/`/g, "\\`").replace(/\[/g, "\\[").replace(/\]/g, "\\]").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
+/**
+ * Current board state for diagnostics (e.g. `neuraldash.debugTooltip`).
+ * Returns live references — read-only use.
+ */
+export interface BoardSnapshotData {
+  snapshot: Snapshot | null;
+  valued: ValuedQuote[];
+  bestSlug: string | null;
+  tariff: number;
+  registrySource: string;
 }

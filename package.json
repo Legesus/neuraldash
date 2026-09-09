@@ -3,7 +3,7 @@
   "displayName": "NeuralDash — Energy Board",
   "description": "Live NeuralWatt energy-per-request board with value ranking and status bar.",
   "publisher": "adamd",
-  "version": "0.4.6",
+  "version": "0.4.11",
   "icon": "media/icon.png",
   "engines": {
     "vscode": "^1.85.0"
@@ -20,7 +20,9 @@
     "onCommand:neuraldash.pickBestValue",
     "onCommand:neuraldash.setMyModel",
     "onCommand:neuraldash.openPricingPage",
-    "onCommand:neuraldash.copySlug"
+    "onCommand:neuraldash.copySlug",
+    "onCommand:neuraldash.openModelChart",
+    "onCommand:neuraldash.debugTooltip"
   ],
   "main": "./out/src/extension.js",
   "contributes": {
@@ -83,6 +85,17 @@
         "command": "neuraldash.copySlug",
         "title": "NeuralDash: Copy Model Slug",
         "category": "NeuralDash"
+      },
+      {
+        "command": "neuraldash.openModelChart",
+        "title": "NeuralDash: Open 48h Trend Chart",
+        "category": "NeuralDash",
+        "icon": "$(pulse)"
+      },
+      {
+        "command": "neuraldash.debugTooltip",
+        "title": "NeuralDash: Debug Tooltip Markdown",
+        "category": "NeuralDash"
       }
     ],
     "menus": {
@@ -98,6 +111,22 @@
           "command": "neuraldash.openPricingPage",
           "when": "view == neuralwatt.board",
           "group": "inline"
+        },
+        {
+          "command": "neuraldash.openModelChart",
+          "when": "view == neuralwatt.board && (viewItem == model || viewItem == model.best || viewItem == model.preview)",
+          "group": "inline"
+        },
+        {
+          "command": "neuraldash.openModelChart",
+          "when": "view == neuralwatt.board && (viewItem == model || viewItem == model.best || viewItem == model.preview)",
+          "group": "navigation"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "neuraldash.debugTooltip",
+          "when": "false"
         }
       ]
     },

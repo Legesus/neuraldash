@@ -61,7 +61,7 @@ export function sparklineIconSvg(
 }
 
 /**
- * Render a full-size 48h trend chart SVG for the hover tooltip, at the
+ * Render a full-size 48h trend chart SVG for chart surfaces, at the
  * site's own source geometry (100x30 viewBox, stretches like the site's).
  * Single emphasis dot on the LAST point ("now"); no severity dot, no
  * per-point circles. Returns null when the sparkline is absent/unusable.
