@@ -4,6 +4,21 @@
   "description": "Live NeuralWatt energy-per-request board with value ranking and status bar.",
   "publisher": "adamd",
   "version": "0.4.11",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Legesus/neuraldash"
+  },
+  "keywords": [
+    "energy",
+    "pricing",
+    "llm",
+    "ai",
+    "tokens",
+    "cost",
+    "neuralwatt",
+    "efficiency"
+  ],
   "icon": "media/icon.png",
   "engines": {
     "vscode": "^1.85.0"
