@@ -2,7 +2,7 @@
   "name": "neuraldash",
   "displayName": "NeuralDash — Energy Board",
   "description": "Live NeuralWatt energy-per-request board with value ranking and status bar.",
-  "publisher": "adamd",
+  "publisher": "Legesus",
   "version": "0.4.11",
   "license": "MIT",
   "repository": {
