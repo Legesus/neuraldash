@@ -1,6 +1,6 @@
 {
   "name": "neuraldash",
-  "displayName": "NeuralDash — Energy Board",
+  "displayName": "NeuralDash - Energy Board",
   "description": "Live NeuralWatt energy-per-request board with value ranking and status bar.",
   "publisher": "Legesus",
   "version": "0.4.11",
