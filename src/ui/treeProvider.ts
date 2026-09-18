@@ -3,16 +3,17 @@ import type { Snapshot, ValuedQuote, SortOrder } from "../core/types";
 import { costPer1kUsd } from "../core/energy";
 import { computeSeverityScale, basisToSvgUri } from "../core/color";
 import type { SeverityScale } from "../core/color";
-import type { RegistryModel } from "../core/flex";
+import type { FlexEntry, FlexSources, MultiplierOrigin } from "../core/flexCatalog";
+import { formatFlexEntryDescription } from "../core/flexCatalog";
 import { modelRowDescription, tooltipFooter, buildModelTooltipMd, escapeMarkdownLocal } from "../core/rowView";
 import { NEURALWATT_URL } from "../providers/neuralwattProvider";
-import { formatFlexDescription, formatContextTokens } from "../core/flex";
+import { formatContextTokens } from "../core/flex";
 
 export class FlexSectionItem extends vscode.TreeItem {
-  constructor(public readonly flexModels: RegistryModel[]) {
-    super("Flex tiers — registry pricing, no live energy data", vscode.TreeItemCollapsibleState.Expanded);
+  constructor(public readonly flexEntries: FlexEntry[]) {
+    super("Flex tiers — catalog pricing, no live energy data", vscode.TreeItemCollapsibleState.Expanded);
     this.contextValue = "flex.header";
-    this.description = `${flexModels.length} variants`;
+    this.description = `${flexEntries.length} variants`;
     // grey zap icon for the header (same grey as null-basis)
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path fill="#808080" d="M9.5 1 3.5 9.2h3.4L6 15l6.5-8.2H9.1L9.5 1z"/></svg>`;
     this.iconPath = vscode.Uri.parse("data:image/svg+xml;utf8," + encodeURIComponent(svg));
@@ -32,8 +33,9 @@ export class BoardTreeProvider implements vscode.TreeDataProvider<vscode.TreeIte
   private colorScaleEnabled = true;
   private flexEnabled = true;
   private scale: SeverityScale = { lnMin: 0, lnMax: 0, count: 0 };
-  private flexTiers: RegistryModel[] = [];
+  private flexEntries: FlexEntry[] = [];
   private registrySource = "";
+  private flexSources: FlexSources | null = null;
 
   constructor(private readonly context: vscode.ExtensionContext) {
     const saved = context.workspaceState.get<SortOrder>("sortOrder");
@@ -53,15 +55,17 @@ export class BoardTreeProvider implements vscode.TreeDataProvider<vscode.TreeIte
     valued: ValuedQuote[],
     bestSlug: string | null,
     tariff: number,
-    flexTiers: RegistryModel[] = [],
+    flexEntries: FlexEntry[] = [],
     registrySource = "",
+    flexSources: FlexSources | null = null,
   ): void {
     this.snapshot = snapshot;
     this.valued = valued;
     this.bestSlug = bestSlug;
     this.tariff = tariff;
-    this.flexTiers = flexTiers;
+    this.flexEntries = flexEntries;
     this.registrySource = registrySource;
+    this.flexSources = flexSources;
     // compute severity scale once per render
     const bases = valued.map((v) => v.basisMwh);
     this.scale = computeSeverityScale(bases);
@@ -105,7 +109,7 @@ export class BoardTreeProvider implements vscode.TreeDataProvider<vscode.TreeIte
   async getChildren(element?: vscode.TreeItem): Promise<vscode.TreeItem[]> {
     // Flex header children
     if (element instanceof FlexSectionItem) {
-      return element.flexModels.map((m) => this.toFlexItem(m));
+      return element.flexEntries.map((e) => this.toFlexItem(e));
     }
 
     if (!this.snapshot || this.valued.length === 0) {
@@ -116,39 +120,40 @@ export class BoardTreeProvider implements vscode.TreeDataProvider<vscode.TreeIte
     const sorted = this.applySort(this.valued);
     const rows: vscode.TreeItem[] = sorted.map((v) => this.toTreeItem(v));
 
-    // Append flex collapsible section when enabled and registry has tiers
-    if (this.flexEnabled && this.flexTiers.length > 0) {
-      rows.push(new FlexSectionItem(this.flexTiers));
+    // Append flex collapsible section when enabled and the catalog has rows
+    if (this.flexEnabled && this.flexEntries.length > 0) {
+      rows.push(new FlexSectionItem(this.flexEntries));
     }
     return rows;
   }
 
-  private toFlexItem(m: RegistryModel): vscode.TreeItem {
-    const label = m.name || m.slug;
+  private toFlexItem(entry: FlexEntry): vscode.TreeItem {
+    const label = entry.name + (entry.preview ? " (preview)" : "");
     const item = new vscode.TreeItem(label, vscode.TreeItemCollapsibleState.None);
-    item.description = formatFlexDescription(m);
+    item.description = formatFlexEntryDescription(entry);
     item.contextValue = "flex.model";
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path fill="#808080" d="M9.5 1 3.5 9.2h3.4L6 15l6.5-8.2H9.1L9.5 1z"/></svg>`;
     item.iconPath = vscode.Uri.parse("data:image/svg+xml;utf8," + encodeURIComponent(svg));
 
     const md = new vscode.MarkdownString(undefined, true);
     const lines: string[] = [];
-    lines.push(`**${escapeMarkdownLocal(m.name)}**  \n\`slug: ${escapeMarkdownLocal(m.slug)}\``);
+    lines.push(`**${escapeMarkdownLocal(entry.name)}**  \n\`slug: ${escapeMarkdownLocal(entry.slug)}\``);
     lines.push("");
     lines.push(`| Field | Value |`);
     lines.push(`|---|---|`);
-    lines.push(`| Provider | ${escapeMarkdownLocal(m.provider)} |`);
-    lines.push(`| Family | ${escapeMarkdownLocal(m.family ?? "-")} |`);
-    lines.push(`| Context | ${escapeMarkdownLocal(formatContextTokens(m.context))} tokens |`);
-    lines.push(`| Input | $${escapeMarkdownLocal(m.cost.input.toFixed(2))} /1M tok |`);
-    lines.push(`| Output | $${escapeMarkdownLocal(m.cost.output.toFixed(2))} /1M tok |`);
-    if (m.cost.cache_read != null) lines.push(`| Cache read | $${escapeMarkdownLocal(m.cost.cache_read.toFixed(3))} |`);
-    if (m.description) lines.push(`| Description | ${escapeMarkdownLocal(m.description)} |`);
-    if (m.last_updated) lines.push(`| Last updated | ${escapeMarkdownLocal(m.last_updated)} |`);
-    lines.push(`| Source | ${escapeMarkdownLocal(this.registrySource)} |`);
-    lines.push(`\n_Pricing from registry — no live energy data_`);
+    lines.push(`| Provider | ${escapeMarkdownLocal(entry.provider)} |`);
+    lines.push(`| Family | ${escapeMarkdownLocal(entry.family ?? "-")} |`);
+    lines.push(`| Context | ${escapeMarkdownLocal(formatContextTokens(entry.context))} tokens |`);
+    lines.push(`| Input | ${entry.inputPerMillion == null ? "-" : `$${escapeMarkdownLocal(entry.inputPerMillion.toFixed(2))} /1M tok`} |`);
+    lines.push(`| Output | ${entry.outputPerMillion == null ? "-" : `$${escapeMarkdownLocal(entry.outputPerMillion.toFixed(2))} /1M tok`} |`);
+    if (entry.cacheReadPerMillion != null) lines.push(`| Cache read | $${escapeMarkdownLocal(entry.cacheReadPerMillion.toFixed(3))} |`);
+    if (entry.description) lines.push(`| Description | ${escapeMarkdownLocal(entry.description)} |`);
+    if (entry.lastUpdated) lines.push(`| Last updated | ${escapeMarkdownLocal(entry.lastUpdated)} |`);
+    lines.push(`| Membership | ${escapeMarkdownLocal(membershipLabel(entry, this.flexSources))} |`);
+    lines.push(`| Pricing | ${escapeMarkdownLocal(flexSourceLabel(entry, this.flexSources))} |`);
+    lines.push(`\n_Flex pricing from model catalog — no live energy data_`);
     // Same sticky-hover footer as model rows; isTrusted required for the command: link.
-    lines.push(tooltipFooter(NEURALWATT_URL, m.slug));
+    lines.push(tooltipFooter(NEURALWATT_URL, entry.slug));
     md.value = lines.join("\n");
     md.isTrusted = true;
     item.tooltip = md;
@@ -232,6 +237,76 @@ export class BoardTreeProvider implements vscode.TreeDataProvider<vscode.TreeIte
     item.command = undefined;
 
     return item;
+  }
+}
+
+function fetchedStamp(at: string | null | undefined): string {
+  return at ? `fetched ${at}` : "fetched \u2014";
+}
+
+/** Human label for the multiplier ladder rung that supplied the value. */
+function multiplierOriginLabel(origin: MultiplierOrigin | null | undefined): string {
+  switch (origin) {
+    case "alias-own":
+      return "alias-own multiplier";
+    case "family-sibling":
+      return "family-sibling multiplier";
+    case "doc-harvest":
+      return "doc-wide multiplier";
+    default:
+      return "multiplier unavailable";
+  }
+}
+
+/**
+ * Tooltip Membership line: which fetched document(s) establish the row and
+ * when each was last fetched.
+ */
+function membershipLabel(entry: FlexEntry, sources: FlexSources | null): string {
+  const v1At = fetchedStamp(sources?.v1?.fetchedAt);
+  const perfAt = fetchedStamp(sources?.perf?.fetchedAt);
+  switch (entry.membership) {
+    case "both":
+      return `portal perf view flex lane (${perfAt}) + /v1/models flex alias (${v1At})`;
+    case "perf-lane":
+      return `portal perf view flex lane (${perfAt})`;
+    case "v1-alias":
+      return `/v1/models flex alias (${v1At})`;
+  }
+}
+
+/**
+ * Tooltip Pricing line: names the DOCUMENT behind the price and its fetchedAt.
+ * "v1-alias" = exact prices straight from /v1/models (already discounted;
+ * never re-multiplied); "models-dev" = the models.dev alias row; "v1-derived"
+ * = /v1/models standard base x the documented multiplier (value + rung shown);
+ * "portal-card" = portal /models family card x the documented multiplier —
+ * card input is exact but the footer output is display-rounded (caveat shown;
+ * the CARDS document's fetchedAt is stamped, not the v1 one); "tbd" = no
+ * published pricing, with the reason the chain recorded.
+ */
+function flexSourceLabel(entry: FlexEntry, sources: FlexSources | null): string {
+  const stamp = sources?.v1?.fetchedAt ? `; fetched ${sources.v1.fetchedAt}` : "";
+  const cardsStamp = sources?.cards?.fetchedAt ? `; fetched ${sources.cards.fetchedAt}` : "";
+  switch (entry.provenance) {
+    case "v1-alias":
+      return `Neuralwatt /v1/models flex alias (exact flex pricing${stamp})`;
+    case "models-dev":
+      return "models.dev display price";
+    case "v1-derived": {
+      const origin = multiplierOriginLabel(entry.multiplierOrigin);
+      return entry.flexMultiplier != null
+        ? `derived from /v1/models standard \u00d7 ${entry.flexMultiplier}\u00d7 (${origin}${stamp})`
+        : `derived from /v1/models standard (${origin}${stamp})`;
+    }
+    case "portal-card": {
+      const origin = multiplierOriginLabel(entry.multiplierOrigin);
+      return entry.flexMultiplier != null
+        ? `derived from portal /models card \u00d7 ${entry.flexMultiplier}\u00d7 (${origin}; input exact, output display-rounded${cardsStamp})`
+        : `derived from portal /models card (${origin}; input exact, output display-rounded${cardsStamp})`;
+    }
+    case "tbd":
+      return entry.tbdReason ?? (entry.preview ? "preview \u2014 no published pricing (TBD)" : "no published pricing (TBD)");
   }
 }
 

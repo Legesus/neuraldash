@@ -3,7 +3,7 @@
   "displayName": "NeuralDash - Energy Board",
   "description": "Live NeuralWatt energy-per-request board with value ranking and status bar.",
   "publisher": "Legesus",
-  "version": "0.4.11",
+  "version": "0.4.16",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -37,7 +37,8 @@
     "onCommand:neuraldash.openPricingPage",
     "onCommand:neuraldash.copySlug",
     "onCommand:neuraldash.openModelChart",
-    "onCommand:neuraldash.debugTooltip"
+    "onCommand:neuraldash.debugTooltip",
+    "onCommand:neuraldash.debugFlex"
   ],
   "main": "./out/src/extension.js",
   "contributes": {
@@ -111,6 +112,11 @@
         "command": "neuraldash.debugTooltip",
         "title": "NeuralDash: Debug Tooltip Markdown",
         "category": "NeuralDash"
+      },
+      {
+        "command": "neuraldash.debugFlex",
+        "title": "NeuralDash: Debug Flex Catalog",
+        "category": "NeuralDash"
       }
     ],
     "menus": {
@@ -141,6 +147,10 @@
       "commandPalette": [
         {
           "command": "neuraldash.debugTooltip",
+          "when": "false"
+        },
+        {
+          "command": "neuraldash.debugFlex",
           "when": "false"
         }
       ]

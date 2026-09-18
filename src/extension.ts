@@ -7,10 +7,14 @@ import { pickBestValueQuickPick, pickMyModel } from "./ui/quickPicks";
 import { CacheManager, createVsCodeStorage } from "./core/cache";
 import { RegistryCacheManager } from "./core/registryCache";
 import type { RegistryCacheData } from "./core/registryCache";
+import { FlexCatalogCacheManager } from "./core/flexCatalogCache";
+import type { FlexCatalogCacheData } from "./core/flexCatalogCache";
 import { NeuralwattProvider } from "./providers/neuralwattProvider";
 import { ModelsDevRegistryProvider } from "./providers/modelsDevProvider";
+import { NeuralwattModelsProvider } from "./providers/neuralwattModelsProvider";
 import { Controller } from "./controller";
 import { rankQuotes, bestValueSlug } from "./core/ranking";
+import { applyDisplayNames } from "./core/displayNames";
 import { mergedScores, resolveBundledScoresPath } from "./core/scores";
 import { resolveSlugArg, buildModelTooltipMd, resolveModelRefArg } from "./core/rowView";
 import { findModelBySlug, buildModelChartHtml } from "./core/chartPanel";
@@ -19,6 +23,7 @@ import { NEURALWATT_URL } from "./providers/neuralwattProvider";
 export function activate(context: vscode.ExtensionContext): void {
   const provider = new NeuralwattProvider();
   const registryProvider = new ModelsDevRegistryProvider();
+  const flexProvider = new NeuralwattModelsProvider();
 
   const storagePath = context.globalStorageUri.fsPath;
   const fsImpl = {
@@ -30,6 +35,8 @@ export function activate(context: vscode.ExtensionContext): void {
   const cache = new CacheManager(storage);
   const registryStorage = createVsCodeStorage<RegistryCacheData>(storagePath, fsImpl as never, "registry-cache.json");
   const registryStore = new RegistryCacheManager(registryStorage);
+  const flexStorage = createVsCodeStorage<FlexCatalogCacheData>(storagePath, fsImpl as never, "flex-catalog-cache.json");
+  const flexStore = new FlexCatalogCacheManager(flexStorage);
 
   const tree = new BoardTreeProvider(context);
   const treeView = vscode.window.createTreeView("neuralwatt.board", {
@@ -40,7 +47,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const statusBar = new StatusBarController();
   context.subscriptions.push(treeView, statusBar as unknown as vscode.Disposable);
 
-  const controller = new Controller(context, provider, registryProvider, cache, registryStore, tree, statusBar, treeView, context.extensionPath);
+  const controller = new Controller(context, provider, registryProvider, flexProvider, cache, registryStore, flexStore, tree, statusBar, treeView, context.extensionPath);
   context.subscriptions.push({ dispose: () => controller.dispose() });
   void controller.activate();
 
@@ -97,7 +104,7 @@ export function activate(context: vscode.ExtensionContext): void {
       const bundledPath = resolveBundledScoresPath(context.extensionPath);
       const overridePath = vscode.workspace.getConfiguration("neuraldash").get<string>("scoresOverridePath", "");
       const table = mergedScores(bundledPath, overridePath);
-      const valued = rankQuotes(cached.snapshot.quotes, table, tariff, preferred);
+      const valued = applyDisplayNames(rankQuotes(cached.snapshot.quotes, table, tariff, preferred), controller.boardDisplayNames());
       await pickBestValueQuickPick(valued);
     }),
     vscode.commands.registerCommand("neuraldash.setMyModel", async () => {
@@ -111,7 +118,7 @@ export function activate(context: vscode.ExtensionContext): void {
       const bundledPath = resolveBundledScoresPath(context.extensionPath);
       const overridePath = vscode.workspace.getConfiguration("neuraldash").get<string>("scoresOverridePath", "");
       const table = mergedScores(bundledPath, overridePath);
-      const valued = rankQuotes(cached.snapshot.quotes, table, tariff, preferred);
+      const valued = applyDisplayNames(rankQuotes(cached.snapshot.quotes, table, tariff, preferred), controller.boardDisplayNames());
       const chosen = await pickMyModel(valued);
       if (chosen !== undefined) {
         await vscode.workspace.getConfiguration("neuraldash").update("myModel", chosen, vscode.ConfigurationTarget.Global);
@@ -146,6 +153,20 @@ export function activate(context: vscode.ExtensionContext): void {
       channel.appendLine(`contains <img (expect false — hover is text-only): ${md.includes("<img")}`);
       channel.appendLine("--- full tooltip markdown ---");
       channel.appendLine(md);
+      channel.show();
+    }),
+    vscode.commands.registerCommand("neuraldash.debugFlex", async () => {
+      // Diagnostic: per-row evidence for the derived flex catalog — which
+      // fetched document established membership, which document priced the
+      // row (with exact values), the multiplier + ladder rung, preview status
+      // and a report-only cross-check against the board's preview markers.
+      const dump = await controller.flexDiagnostics();
+      if (!dump) {
+        void vscode.window.showInformationMessage("No flex data — refresh first");
+        return;
+      }
+      const channel = vscode.window.createOutputChannel("NeuralDash Debug");
+      channel.appendLine(dump);
       channel.show();
     }),
     vscode.commands.registerCommand("neuraldash.copySlug", async (arg: unknown) => {

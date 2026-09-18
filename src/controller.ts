@@ -5,11 +5,20 @@ import { BoardTreeProvider } from "./ui/treeProvider";
 import { StatusBarController } from "./ui/statusBar";
 import { rankQuotes, bestValueSlug } from "./core/ranking";
 import { mergedScores, resolveBundledScoresPath } from "./core/scores";
-import { loadModelsRegistry, flexTiers, resolveBundledRegistryPath } from "./core/flex";
-import type { RegistryModel } from "./core/flex";
+import { loadModelsRegistry, resolveBundledRegistryPath } from "./core/flex";
 import { transformModelsDevRegistry } from "./core/registryTransform";
 import { RegistryCacheManager } from "./core/registryCache";
+import { buildFlexCatalog, harvestDocMultiplier, parseNeuralwattModels } from "./core/flexCatalog";
+import type { FlexEntry, FlexSources, NeuralwattModelsDoc } from "./core/flexCatalog";
+import { buildFlexDiagnostics } from "./core/flexDiagnostics";
+import { parseFlexPerfView } from "./core/flexPerf";
+import type { FlexPerfDoc } from "./core/flexPerf";
+import { parseFlexCatalogCards } from "./core/flexCatalogCards";
+import type { FlexCardsDoc } from "./core/flexCatalogCards";
+import { buildDisplayNameMap, applyDisplayNames } from "./core/displayNames";
+import { FlexCatalogCacheManager } from "./core/flexCatalogCache";
 import type { RegistryDataProvider } from "./providers/modelsDevProvider";
+import type { NeuralwattModelsProvider } from "./providers/neuralwattModelsProvider";
 import { NEURALWATT_URL } from "./providers/neuralwattProvider";
 
 export class Controller {
@@ -20,13 +29,25 @@ export class Controller {
   private registryCache: import("./core/flex").ModelsRegistry | null = null;
   private registrySource = "";
   private registryFetching = false;
+  private flexV1DocCache: NeuralwattModelsDoc | null = null;
+  private flexV1FetchedAt: string | null = null;
+  private flexV1Hash: string | null = null;
+  private flexPerfDocCache: FlexPerfDoc | null = null;
+  private flexPerfFetchedAt: string | null = null;
+  private flexPerfHash: string | null = null;
+  private flexCardsDocCache: FlexCardsDoc | null = null;
+  private flexCardsFetchedAt: string | null = null;
+  private flexCardsHash: string | null = null;
+  private flexFetching = false;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
     private readonly provider: DataProvider,
     private readonly registryProvider: RegistryDataProvider,
+    private readonly flexProvider: NeuralwattModelsProvider,
     private readonly cache: CacheManager,
     private readonly registryStore: RegistryCacheManager,
+    private readonly flexStore: FlexCatalogCacheManager,
     private readonly tree: BoardTreeProvider,
     private readonly statusBar: StatusBarController,
     private readonly treeView: vscode.TreeView<vscode.TreeItem>,
@@ -48,6 +69,30 @@ export class Controller {
       }
     } catch {
       // corrupt/unreadable registry cache -> bundled fallback stays
+    }
+
+    // Load flex catalog: cached docs only (no bundled fallback — the fetched
+    // /v1/models + perf-view + /models-cards documents are authoritative and
+    // refreshed below).
+    try {
+      const storedFlex = await this.flexStore.load();
+      if (storedFlex.v1.doc) {
+        this.flexV1DocCache = storedFlex.v1.doc;
+        this.flexV1FetchedAt = storedFlex.v1.lastSuccessAt;
+        this.flexV1Hash = storedFlex.v1.contentHash;
+      }
+      if (storedFlex.perf.doc) {
+        this.flexPerfDocCache = storedFlex.perf.doc;
+        this.flexPerfFetchedAt = storedFlex.perf.lastSuccessAt;
+        this.flexPerfHash = storedFlex.perf.contentHash;
+      }
+      if (storedFlex.cards.doc) {
+        this.flexCardsDocCache = storedFlex.cards.doc;
+        this.flexCardsFetchedAt = storedFlex.cards.lastSuccessAt;
+        this.flexCardsHash = storedFlex.cards.contentHash;
+      }
+    } catch {
+      // corrupt/unreadable flex cache -> empty flex section until first fetch
     }
 
     // stale-first render
@@ -117,15 +162,33 @@ export class Controller {
     const valued = rankQuotes(snapshot.quotes, table, tariff, preferred);
     const best = bestValueSlug(valued);
 
-    // Flex tiers per render: board slugs set
+    // Board display names: re-attach the publisher's proper label (the board
+    // page serves raw ids) by joining the three already-fetched flex docs.
+    // Non-mutating — the cached snapshot keeps the scraped titles.
+    const enriched = applyDisplayNames(
+      valued,
+      buildDisplayNameMap(this.flexV1DocCache, this.registryCache, this.flexCardsDocCache),
+    );
+
+    // Flex catalog per render: document membership + registry enrichment + board slugs
     const showFlex = vscode.workspace.getConfiguration("neuraldash").get<boolean>("showFlexTiers", true);
-    const flexList: RegistryModel[] = showFlex
-      ? flexTiers(this.registryCache, new Set(snapshot.quotes.map((q) => q.slug)))
+    const flexList: FlexEntry[] = showFlex
+      ? buildFlexCatalog(this.flexV1DocCache, this.flexPerfDocCache, this.flexCardsDocCache, this.registryCache, new Set(snapshot.quotes.map((q) => q.slug)))
       : [];
 
-    this.tree.setData(snapshot, valued, best, tariff, flexList, this.registrySource);
+    this.tree.setData(snapshot, enriched, best, tariff, flexList, this.registrySource, this.flexSources());
     const myModel = vscode.workspace.getConfiguration("neuraldash").get<string>("myModel", "");
-    this.statusBar.update(myModel, valued);
+    this.statusBar.update(myModel, enriched);
+  }
+
+  /**
+   * Current board id -> display-name map, built from the in-memory fetched
+   * docs (render parity). The quick-pick commands re-rank from cache
+   * independently of render(), so they wrap their own rankQuotes output with
+   * this instead of consuming tree state.
+   */
+  boardDisplayNames(): ReadonlyMap<string, string> {
+    return buildDisplayNameMap(this.flexV1DocCache, this.registryCache, this.flexCardsDocCache);
   }
 
   private schedule(minutes: number): void {
@@ -145,8 +208,9 @@ export class Controller {
     if (this.isFetching) return;
     this.isFetching = true;
     try {
-      // Registry refresh rides the board cycle but never blocks it.
+      // Registry + flex catalog refreshes ride the board cycle but never block it.
       void this.refreshRegistry();
+      void this.refreshFlexCatalog();
       const cached = await this.cache.load();
       const etag = cached.etag;
       const result = await this.provider.fetchSnapshot(etag);
@@ -239,6 +303,121 @@ export class Controller {
       // rejection and must never touch treeView.message, backoff, or scheduling.
     } finally {
       this.registryFetching = false;
+    }
+  }
+
+  /**
+   * Evidence dump for `neuraldash.debugFlex`: per-row membership + pricing
+   * provenance built from the SAME inputs as render() (never a separate code
+   * path). Null when no flex document has ever been fetched.
+   */
+  async flexDiagnostics(): Promise<string | null> {
+    if (!this.flexV1DocCache && !this.flexPerfDocCache && !this.flexCardsDocCache) return null;
+    const cached = await this.cache.load();
+    const quotes = cached.snapshot?.quotes ?? [];
+    const boardSlugs = new Set(quotes.map((q) => q.slug));
+    const entries = buildFlexCatalog(this.flexV1DocCache, this.flexPerfDocCache, this.flexCardsDocCache, this.registryCache, boardSlugs);
+    return buildFlexDiagnostics({
+      entries,
+      sources: this.flexSources(),
+      v1Hash: this.flexV1Hash,
+      perfHash: this.flexPerfHash,
+      cardsHash: this.flexCardsHash,
+      harvest: harvestDocMultiplier(this.flexV1DocCache),
+      boardPreviewSlugs: new Set(quotes.filter((q) => q.isPreview).map((q) => q.slug)),
+      boardSlugs,
+    });
+  }
+
+  /** Document refs for tooltip Source lines / diagnostics. */
+  private flexSources(): FlexSources {
+    return {
+      v1: this.flexV1DocCache ? { url: this.flexProvider.sourceUrl, fetchedAt: this.flexV1FetchedAt } : null,
+      perf: this.flexPerfDocCache ? { url: this.flexProvider.perfUrl, fetchedAt: this.flexPerfFetchedAt } : null,
+      cards: this.flexCardsDocCache ? { url: this.flexProvider.modelsPageUrl, fetchedAt: this.flexCardsFetchedAt } : null,
+    };
+  }
+
+  /**
+   * Live triple-document refresh (v1 JSON + perf-view HTML + /models cards
+   * HTML) — fire-and-forget from fetchAndRender. Mirrors refreshRegistry's
+   * guarantees: ONE re-entrancy guard, silent on all failures (never touches
+   * treeView.message, backoff, or scheduling); per-document independent
+   * handling — content-hash-equal is a no-op, a parse-null keeps last-known
+   * and persists NOTHING (self-heal next cycle), a parsed ok updates memory +
+   * the cache slot. The view re-renders only when a document actually
+   * changed; otherwise lastCheckedAt is touched.
+   */
+  private async refreshFlexCatalog(): Promise<void> {
+    if (this.flexFetching) return;
+    this.flexFetching = true;
+    try {
+      const stored = await this.flexStore.load();
+      let changed = false;
+
+      const v1Result = await this.flexProvider.fetchModels(stored.v1.contentHash);
+      if (v1Result.status === "ok") {
+        const parsed = parseNeuralwattModels(v1Result.json);
+        if (parsed) {
+          this.flexV1DocCache = parsed;
+          this.flexV1FetchedAt = new Date().toISOString();
+          this.flexV1Hash = v1Result.contentHash;
+          try {
+            await this.flexStore.saveV1(parsed, v1Result.contentHash);
+          } catch {
+            // persistence is best-effort; in-memory doc already applied
+          }
+          changed = true;
+        }
+      }
+
+      const perfResult = await this.flexProvider.fetchPerformanceView(stored.perf.contentHash);
+      if (perfResult.status === "ok") {
+        const parsed = parseFlexPerfView(perfResult.html);
+        if (parsed) {
+          this.flexPerfDocCache = parsed;
+          this.flexPerfFetchedAt = new Date().toISOString();
+          this.flexPerfHash = perfResult.contentHash;
+          try {
+            await this.flexStore.savePerf(parsed, perfResult.contentHash);
+          } catch {
+            // persistence is best-effort; in-memory doc already applied
+          }
+          changed = true;
+        }
+      }
+
+      const cardsResult = await this.flexProvider.fetchModelsCards(stored.cards.contentHash);
+      if (cardsResult.status === "ok") {
+        const parsed = parseFlexCatalogCards(cardsResult.html);
+        if (parsed) {
+          this.flexCardsDocCache = parsed;
+          this.flexCardsFetchedAt = new Date().toISOString();
+          this.flexCardsHash = cardsResult.contentHash;
+          try {
+            await this.flexStore.saveCards(parsed, cardsResult.contentHash);
+          } catch {
+            // persistence is best-effort; in-memory doc already applied
+          }
+          changed = true;
+        }
+      }
+
+      if (changed) {
+        await this.rerenderFlexFromCache();
+      } else {
+        try {
+          await this.flexStore.touchChecked();
+        } catch {
+          // best-effort
+        }
+      }
+      // blocked / error / notModified -> silent no-op
+    } catch {
+      // Silent: a fire-and-forget refresh must never surface as an unhandled
+      // rejection and must never touch treeView.message, backoff, or scheduling.
+    } finally {
+      this.flexFetching = false;
     }
   }
 

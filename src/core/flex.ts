@@ -1,6 +1,8 @@
 /**
- * Flex tier loader and formatters — vscode-free.
+ * Models-registry types + loader — vscode-free.
  * Mirrors scores.ts pattern: loadModelsRegistry -> null on missing/corrupt, no throw.
+ * Flex MEMBERSHIP/pricing now lives in flexCatalog.ts (derived from
+ * Neuralwatt /v1/models); the registry here is the enrichment source.
  */
 import * as fs from "fs";
 import * as path from "path";
@@ -60,39 +62,6 @@ export function loadModelsRegistry(filePath: string): ModelsRegistry | null {
   } catch {
     return null;
   }
-}
-
-/**
- * Flex tiers: entries whose slug ends with "-flex" AND not on board AND numeric cost.input,
- * sorted by cost.input ascending.
- */
-export function flexTiers(registry: ModelsRegistry | null, boardSlugs: Set<string>): RegistryModel[] {
-  if (!registry) return [];
-  const out: RegistryModel[] = [];
-  for (const m of Object.values(registry.models)) {
-    if (!m.slug.endsWith("-flex")) continue;
-    if (boardSlugs.has(m.slug)) continue;
-    // Both fields are rendered in the row description — require them up front
-    const input = m.cost?.input;
-    const output = m.cost?.output;
-    if (typeof input !== "number" || !Number.isFinite(input)) continue;
-    if (typeof output !== "number" || !Number.isFinite(output)) continue;
-    out.push(m);
-  }
-  out.sort((a, b) => (a.cost.input - b.cost.input));
-  return out;
-}
-
-export function formatFlexDescription(m: RegistryModel): string {
-  const input = formatPrice(m.cost.input);
-  const output = formatPrice(m.cost.output);
-  return `$${input} in \u00b7 $${output} out /1M tok`;
-}
-
-function formatPrice(n: number): string {
-  // Spec shows 4 -> "$4.00", so always 2 decimals
-  if (!Number.isFinite(n)) return "-";
-  return n.toFixed(2);
 }
 
 export function formatContextTokens(context: number | null): string {
