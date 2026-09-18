@@ -2,6 +2,18 @@
 
 All notable changes to NeuralDash are documented here.
 
+## 0.4.16 — 2026-09-18
+
+Flex tiers now retrieve automatically from Neuralwatt's own catalog — zero hardcoded model data:
+
+- **Live flex catalog** — flex membership, pricing, and preview status are enumerated on every board poll from `https://api.neuralwatt.com/v1/models` and the energy-pricing performance view (per-model flex lanes, preview chips). The old models.dev `-flex` slug heuristic is gone: retired models can no longer ghost in the section and newly flex-tagged models appear on the next fetch. models.dev remains as a metadata/pricing fallback only.
+- **Per-row pricing provenance** — each flex row is priced by a labeled chain: exact `/v1/models` alias pricing → models.dev alias → standard × harvested flex multiplier (`0.65× derived`) → portal `/models` card prices (`portal-card`: input exact, output display-rounded) → "pricing TBD" with a stated reason. The multiplier itself is harvested from the documents, never a constant.
+- **Preview models priced** — flex-capable preview models absent from the API (e.g. `deepseek-v4.1-flash`) show derived card pricing with an explicit provenance label instead of "pricing TBD".
+- **Board display names restored** — Neuralwatt's board now ships raw model slugs in its HTML, so rows are joined against the fetched catalogs (API display name → registry → card) for proper names; slug-based actions (copy slug, chart, my-model) are unchanged.
+- **`NeuralDash: Debug Flex`** — dumps the full per-row evidence chain (source documents, fetch times, prices, multiplier harvest) to an output channel.
+- Consistent labels — every flex row carries the `(flex)` marker, sourced verbatim from Neuralwatt where available.
+- A blocking test keeps model-name and multiplier literals out of the flex sources (`test/grepInvariant.test.ts`).
+
 ## 0.4.11 — 2026-09-07
 
 Release hygiene:

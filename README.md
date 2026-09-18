@@ -11,10 +11,10 @@ Live NeuralWatt **energy-per-request** board inside VS Code. Shows `Right now` a
 - Rich, sticky tooltips: full per-band table, colored 48h trend summary, cache hit %, benchmark value, plus `Copy Slug` and `Open Pricing Page` actions.
 - Value ranking: `value = performanceScore / basisMwh` (basis from `preferredBand`).
 - Status bar — pins your chosen model (`neuraldash.myModel`) as `⚡ <name> · 245.48 mWh · $2.45/1k`.
-- Flex tiers — live registry pricing for `-flex` variants not on the live board.
+- Flex tiers — Neuralwatt's flex-tier models retrieved live from the catalog, each row labeled with its pricing provenance.
 - Polling with ETag / `If-None-Match`, 30s timeout, failure backoff (cap 120 min).
 
-> **Note:** NeuralDash is unofficial and reads the public NeuralWatt energy-pricing page directly (no API). If the page's structure changes, parsing may need an update — the board keeps serving its last cached data meanwhile.
+> **Note:** NeuralDash is unofficial and reads the public NeuralWatt energy-pricing page directly (energy pricing is HTML-only; the model catalog comes from Neuralwatt's public `/v1/models` API). If the page's structure changes, parsing may need an update — the board keeps serving its last cached data meanwhile.
 
 ## Configuration
 
@@ -53,13 +53,16 @@ Live NeuralWatt **energy-per-request** board inside VS Code. Shows `Right now` a
 - `Copy Model Slug` (via the tooltip link)
 - `Open Pricing Page`
 
-## Flex tiers (live registry)
+## Flex tiers (live catalog)
 
-The Flex tiers section prices `-flex` variants not on the live board. Pricing refreshes live from
-`https://models.dev/api.json` on every board refresh cycle (cheap `304` when unchanged), with the last
-live fetch cached to global storage and the bundled `data/models-registry.json` as offline fallback.
-The flex tooltip `Source` row shows provenance: `(live, fetched …)`, `(cached …)`, or `bundled registry (…)`.
-Registry failures are silent — the board never waits on or reports them.
+The Flex tiers section lists Neuralwatt's flex-tier models, retrieved automatically on every board
+cycle from `https://api.neuralwatt.com/v1/models` and the energy-pricing performance view
+(per-model flex lanes + preview chips). Membership, pricing, and preview status are enumerated
+from those documents — nothing is hardcoded, so the section follows the portal as models rotate.
+Pricing provenance is labeled per row: exact alias → models.dev alias → `N× derived` (multiplier
+harvested from the catalog) → portal `/models` card → TBD with a reason. The tooltip `Source`
+row names the exact documents and fetch times, and `NeuralDash: Debug Flex` dumps the full
+evidence chain. Catalog failures are silent — the board never waits on or reports them.
 
 ## Development
 
@@ -68,5 +71,5 @@ npm install
 npm run compile      # tsc -p .
 npm test             # tsc -p . && node --test out/test/
 npm run watch
-npx @vscode/vsce package --allow-missing-repository
+npx @vscode/vsce package
 ```
