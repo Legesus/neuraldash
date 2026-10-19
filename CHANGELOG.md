@@ -2,6 +2,14 @@
 
 All notable changes to NeuralDash are documented here.
 
+## 0.4.17 — 2026-10-19
+
+Board readability for brand-new and fast-lane models:
+
+- **New models never render as raw slugs** — when a board entry is unknown to every fetched catalog (API display name, registry, `/models` cards), its slug is mechanically formatted for display (`clef-flash` → `Clef Flash`). No name table: real catalog names outrank the formatting the moment any document learns the id, and a scraped publisher title always wins.
+- **Energy order follows the number shown** — the board sorted by 7-day typical energy while displaying live right-now energy, so fast/speed/flash lanes (whose live usage diverges hardest from typical) broke the cheapest→most-expensive trend. Energy ordering and severity colors now follow the displayed right-now value (typical as fallback); value ranking and best-value star stay on the typical basis so they don't reshuffle with intraday noise.
+- Activity-bar title corrected to NeuralDash.
+
 ## 0.4.16 — 2026-09-18
 
 Flex tiers now retrieve automatically from Neuralwatt's own catalog — zero hardcoded model data:
