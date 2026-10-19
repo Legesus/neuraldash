@@ -1,0 +1,25 @@
+#!/bin/sh
+#
+# commit-msg PII guard — blocks commits whose message (comment lines stripped)
+# trips a PII/secret pattern.
+set -u
+
+cd "$(git rev-parse --show-toplevel)" 2>/dev/null || {
+  echo "PII guard internal error: not inside a git repository" >&2
+  exit 2
+}
+# shellcheck source=.githooks/_scan.sh
+. .githooks/_scan.sh
+pii_init
+
+_cm_rc=0
+sed '/^#/d' "$1" | pii_scan_text commit-msg || _cm_rc=$?
+if [ "$_cm_rc" -eq 1 ]; then
+  pii_report commit-msg
+  exit 1
+fi
+if [ "$_cm_rc" -ne 0 ]; then
+  echo "PII guard internal error: commit message scan failed" >&2
+  exit 2
+fi
+exit 0

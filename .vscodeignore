@@ -15,3 +15,7 @@ tmp_models_dev_api.json
 media/concept-*.svg
 .prototype-png/**
 *.log
+
+# local guard rails (never ship)
+.githooks/**
+.zcode/**

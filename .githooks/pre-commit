@@ -1,0 +1,51 @@
+#!/bin/sh
+#
+# pre-commit PII guard — blocks commits whose staged diff (or the commit
+# identity itself) trips a PII/secret pattern.
+# Activate once per clone with: git config core.hooksPath .githooks
+set -u
+
+cd "$(git rev-parse --show-toplevel)" 2>/dev/null || {
+  echo "PII guard internal error: not inside a git repository" >&2
+  exit 2
+}
+# shellcheck source=.githooks/_scan.sh
+. .githooks/_scan.sh
+pii_init
+
+# 1) Staged diff scan (added lines only).
+_pc_rc=0
+git diff --cached --diff-filter=ACMR -U0 | pii_scan_annotated_stream || _pc_rc=$?
+if [ "$_pc_rc" -eq 1 ]; then
+  pii_report pre-commit
+  exit 1
+fi
+if [ "$_pc_rc" -ne 0 ]; then
+  echo "PII guard internal error: staged diff scan failed" >&2
+  exit 2
+fi
+
+# 2) Identity tripwire — identity + personal-email categories only.
+git var GIT_AUTHOR_IDENT > "$PII_TMPDIR/author-ident" 2>/dev/null || {
+  echo "PII guard internal error: git var GIT_AUTHOR_IDENT failed" >&2
+  exit 2
+}
+git var GIT_COMMITTER_IDENT > "$PII_TMPDIR/committer-ident" 2>/dev/null || {
+  echo "PII guard internal error: git var GIT_COMMITTER_IDENT failed" >&2
+  exit 2
+}
+_pc_arc=0
+pii_scan_text author-ident identity personal-email < "$PII_TMPDIR/author-ident" || _pc_arc=$?
+_pc_crc=0
+pii_scan_text committer-ident identity personal-email < "$PII_TMPDIR/committer-ident" || _pc_crc=$?
+if [ "$_pc_arc" -gt 1 ] || [ "$_pc_crc" -gt 1 ]; then
+  echo "PII guard internal error: identity scan failed" >&2
+  exit 2
+fi
+if [ "$_pc_arc" -eq 1 ] || [ "$_pc_crc" -eq 1 ]; then
+  echo "PII guard: commit identity matches PII pattern -- set repo-local git config user.name/user.email or edit .githooks/pii-patterns.local.txt"
+  pii_report pre-commit
+  exit 1
+fi
+
+exit 0

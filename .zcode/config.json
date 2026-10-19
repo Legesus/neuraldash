@@ -1,0 +1,21 @@
+{
+  "hooks": {
+    "events": {
+      "PreToolUse": [
+        {
+          "matcher": "Bash|bash",
+          "hooks": [
+            {
+              "type": "process",
+              "command": "node",
+              "args": ["${ZCODE_PROJECT_DIR}/.githooks/zcode-pretooluse.mjs"],
+              "timeoutMs": 15000,
+              "statusMessage": "PII guard: checking git commit",
+              "enabled": true
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
