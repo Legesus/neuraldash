@@ -75,12 +75,23 @@ export function rankQuotes(
 
 export type SortOrder = "energy" | "value" | "name";
 
+/**
+ * The energy a board row actually displays (descriptionMwh — right-now first),
+ * falling back to the ranking basis when the row shows no number. Energy
+ * ordering and severity color follow this key so the visible list runs
+ * monotonically cheapest -> most expensive; value ranking keeps basisMwh
+ * (typical-first), which stays stable poll-to-poll.
+ */
+export function energySortKey(v: ValuedQuote): number | null {
+  return v.descriptionMwh ?? v.basisMwh;
+}
+
 export function sortValued(list: ValuedQuote[], order: SortOrder): ValuedQuote[] {
   const arr = [...list];
   if (order === "energy") {
     arr.sort((a, b) => {
-      const av = a.basisMwh;
-      const bv = b.basisMwh;
+      const av = energySortKey(a);
+      const bv = energySortKey(b);
       if (av == null && bv == null) return a.quote.displayName.localeCompare(b.quote.displayName);
       if (av == null) return 1;
       if (bv == null) return -1;

@@ -6,6 +6,7 @@ import type { SeverityScale } from "../core/color";
 import type { FlexEntry, FlexSources, MultiplierOrigin } from "../core/flexCatalog";
 import { formatFlexEntryDescription } from "../core/flexCatalog";
 import { modelRowDescription, tooltipFooter, buildModelTooltipMd, escapeMarkdownLocal } from "../core/rowView";
+import { sortValued, energySortKey } from "../core/ranking";
 import { NEURALWATT_URL } from "../providers/neuralwattProvider";
 import { formatContextTokens } from "../core/flex";
 
@@ -66,8 +67,9 @@ export class BoardTreeProvider implements vscode.TreeDataProvider<vscode.TreeIte
     this.flexEntries = flexEntries;
     this.registrySource = registrySource;
     this.flexSources = flexSources;
-    // compute severity scale once per render
-    const bases = valued.map((v) => v.basisMwh);
+    // compute severity scale once per render, over the same energy the rows
+    // display and sort by (right-now first) so color tracks the visible order
+    const bases = valued.map(energySortKey);
     this.scale = computeSeverityScale(bases);
     // colorScale flag read lazily in toTreeItem; but we also keep a cached value from config
     // Controller will call with updated flags via setFlags or we read VS Code config here
@@ -161,39 +163,10 @@ export class BoardTreeProvider implements vscode.TreeDataProvider<vscode.TreeIte
   }
 
   private applySort(list: ValuedQuote[]): ValuedQuote[] {
-    const arr = [...list];
-    if (this.sortOrder === "energy") {
-      arr.sort((a, b) => {
-        const av = a.basisMwh, bv = b.basisMwh;
-        if (av == null && bv == null) return a.quote.displayName.localeCompare(b.quote.displayName);
-        if (av == null) return 1;
-        if (bv == null) return -1;
-        if (av !== bv) return av - bv;
-        return a.quote.displayName.localeCompare(b.quote.displayName);
-      });
-    } else if (this.sortOrder === "value") {
-      arr.sort((a, b) => {
-        const av = a.value, bv = b.value;
-        if (av == null && bv == null) {
-          const am = a.basisMwh, bm = b.basisMwh;
-          if (am == null && bm == null) return a.quote.displayName.localeCompare(b.quote.displayName);
-          if (am == null) return 1;
-          if (bm == null) return -1;
-          return am - bm;
-        }
-        if (av == null) return 1;
-        if (bv == null) return -1;
-        if (av !== bv) return bv - av;
-        const am = a.basisMwh, bm = b.basisMwh;
-        if (am == null && bm == null) return 0;
-        if (am == null) return 1;
-        if (bm == null) return -1;
-        return am - bm;
-      });
-    } else {
-      arr.sort((a, b) => a.quote.displayName.localeCompare(b.quote.displayName));
-    }
-    return arr;
+    // Single comparator source: core sortValued (ranking.test.ts). Energy
+    // order follows the DISPLAYED number (descriptionMwh, right-now first),
+    // so the visible list is monotonic; value order keeps the typical basis.
+    return sortValued(list, this.sortOrder);
   }
 
   private toTreeItem(v: ValuedQuote): vscode.TreeItem {
@@ -212,7 +185,7 @@ export class BoardTreeProvider implements vscode.TreeDataProvider<vscode.TreeIte
     if (isBest) {
       item.iconPath = new vscode.ThemeIcon("star-full");
     } else if (this.colorScaleEnabled) {
-      const svg = basisToSvgUri(v.basisMwh, this.scale);
+      const svg = basisToSvgUri(energySortKey(v), this.scale);
       item.iconPath = vscode.Uri.parse("data:image/svg+xml;utf8," + encodeURIComponent(svg));
     } else {
       item.iconPath = new vscode.ThemeIcon("zap");

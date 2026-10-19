@@ -84,7 +84,7 @@ describe("ranking.rankQuotes value", () => {
 });
 
 describe("ranking comparators", () => {
-  it("sortValued energy: basis asc", () => {
+  it("sortValued energy: displayed energy asc (typical when no live number)", () => {
     const a = mkQuote({ displayName: "A", slug: "a", typicalMwh: 30 });
     const b = mkQuote({ displayName: "B", slug: "b", typicalMwh: 10 });
     const table: ScoreTable = { version: 1, scores: {} };
@@ -92,6 +92,26 @@ describe("ranking comparators", () => {
     const sorted = sortValued(valued, "energy");
     assert.equal(sorted[0].quote.slug, "b");
     assert.equal(sorted[1].quote.slug, "a");
+  });
+
+  it("sortValued energy: fast-lane rows sort by the DISPLAYED number, not typical", () => {
+    // 2026-10-19 board shape: fast lanes' right-now diverges hard from
+    // typical (1300 typical vs 370 now) — displayed number must rule the order.
+    const surge = mkQuote({ displayName: "Surge", slug: "surge", typicalMwh: 1300, rightNowMwh: 370 });
+    const steady = mkQuote({ displayName: "Steady", slug: "steady", typicalMwh: 937, rightNowMwh: 683 });
+    const valued = rankQuotes([surge, steady], { version: 1, scores: {} }, 10, "typical");
+    const sorted = sortValued(valued, "energy");
+    assert.equal(sorted[0].quote.slug, "surge", "370 displayed must sit above 683 displayed");
+    assert.equal(sorted[1].quote.slug, "steady");
+  });
+
+  it("sortValued energy: band-only rows (no displayed number) fall back to basis", () => {
+    const bandOnly = mkQuote({ displayName: "BandOnly", slug: "band-only", bands: mkBands([null, 7, null, null, null, null, null]) });
+    const live = mkQuote({ displayName: "Live", slug: "live", rightNowMwh: 20, typicalMwh: 25 });
+    const valued = rankQuotes([live, bandOnly], { version: 1, scores: {} }, 10, "typical");
+    const sorted = sortValued(valued, "energy");
+    assert.equal(sorted[0].quote.slug, "band-only");
+    assert.equal(sorted[1].quote.slug, "live");
   });
 
   it("sortValued value: desc, nulls last, basis tie-breaker", () => {

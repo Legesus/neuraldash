@@ -5,7 +5,7 @@
  * attribute, so parsed board quotes arrive with the id in BOTH displayName
  * and slug. This module re-attaches the publisher's proper display name by
  * joining the THREE documents the flex pipeline already fetches — no new
- * fetches, no curated name table, no casing heuristics:
+ * fetches, no curated name table:
  *
  *   rung 1 — /v1/models entries: exact entry id -> metadata display_name;
  *   rung 2 — models registry: exact RECORD KEY -> model name;
@@ -14,11 +14,17 @@
  *            parser captured data-name).
  *
  * First writer wins, so rung 1 outranks rung 2 outranks rung 3. All joins are
- * exact-key on the sources' native keys; this module adds no normalization.
- * Ids with no name in any rung get no entry and callers keep the scraped title.
+ * exact-key on the sources' native keys — no fuzzy matching, no name table.
  *
- * Pure, vscode-free. Zero model literals by construction: every string below
- * flows from the caller-supplied documents.
+ *   rung 4 — LAST RESORT, mechanical formatting (not document data): when no
+ *            fetched document knows the id AND the scraped title still equals
+ *            the raw slug, format the slug itself so a brand-new catalog
+ *            entry never renders as a raw slug (see formatSlugForDisplay).
+ *            A scraped title that differs from the id is a real publisher
+ *            name and always wins over rung 4.
+ *
+ * Pure, vscode-free. Zero model literals by construction: every name above
+ * flows from the caller-supplied documents; rung 4 is pure string formatting.
  */
 import type { NeuralwattModelsDoc } from "./flexCatalog";
 import type { ModelsRegistry } from "./flex";
@@ -93,10 +99,28 @@ export function buildDisplayNameMap(
 }
 
 /**
- * Override displayName on the rows the map covers, NON-mutating: rows with
- * no entry pass through by reference; overridden rows are shallow clones
- * ({...v, quote: {...v.quote, displayName}}) so cached snapshots are never
- * touched. quote.slug is identical on every row.
+ * Rung 4, mechanical last resort: format an otherwise-unknown slug for
+ * display. Splits on -/_ runs and capitalizes leading lowercase letters;
+ * digits, dots, and existing casing pass through untouched. This is pure
+ * string formatting — it claims nothing about the publisher's preferred
+ * spelling, and rungs 1-3 stay authoritative whenever any fetched document
+ * knows the id. Separator-only or empty input returns the slug unchanged.
+ */
+export function formatSlugForDisplay(slug: string): string {
+  const formatted = slug
+    .split(/[-_]+/)
+    .filter((t) => t !== "")
+    .map((t) => (/^[a-z]/.test(t) ? t[0].toUpperCase() + t.slice(1) : t))
+    .join(" ");
+  return formatted === "" ? slug : formatted;
+}
+
+/**
+ * Override displayName on the rows the map covers, NON-mutating: overridden
+ * rows are shallow clones ({...v, quote: {...v.quote, displayName}}) so
+ * cached snapshots are never touched. quote.slug is identical on every row.
+ * Rows the map misses get rung 4 formatting only when their scraped title
+ * still equals the raw slug; anything else passes through by reference.
  */
 export function applyDisplayNames(
   valued: readonly ValuedQuote[],
@@ -104,7 +128,15 @@ export function applyDisplayNames(
 ): ValuedQuote[] {
   return valued.map((v) => {
     const name = names.get(v.quote.slug);
-    if (name === undefined) return v;
-    return { ...v, quote: { ...v.quote, displayName: name } };
+    if (name !== undefined) {
+      return { ...v, quote: { ...v.quote, displayName: name } };
+    }
+    if (v.quote.displayName === v.quote.slug) {
+      const formatted = formatSlugForDisplay(v.quote.slug);
+      if (formatted !== v.quote.displayName) {
+        return { ...v, quote: { ...v.quote, displayName: formatted } };
+      }
+    }
+    return v;
   });
 }

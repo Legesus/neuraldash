@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { buildDisplayNameMap, applyDisplayNames } from "../src/core/displayNames";
+import { buildDisplayNameMap, applyDisplayNames, formatSlugForDisplay } from "../src/core/displayNames";
 import type { NeuralwattModelsDoc } from "../src/core/flexCatalog";
 import { parseNeuralwattModels } from "../src/core/flexCatalog";
 import { parseFlexCatalogCards } from "../src/core/flexCatalogCards";
@@ -205,23 +205,51 @@ describe("displayNames — card data-name capture + family fallback", () => {
 });
 
 describe("displayNames — applyDisplayNames reference semantics", () => {
-  it("D12 absent slug passes through by reference; overridden rows are new objects with identical slug", () => {
+  it("D12 overridden + rung-4 rows are clones; a scraped title that differs from the slug passes by reference", () => {
     const names = new Map([["present-id", "Present Name"]]);
     const present = valued("present-id");
-    const absent = valued("absent-id");
-    const before = structuredClone([present, absent]);
-    const after = applyDisplayNames([present, absent], names);
-    assert.equal(after[1], absent, "uncovered row is the SAME object");
+    const unknown = valued("unknown-id"); // scraped title === raw slug -> rung 4 clone
+    const scraped = valued("raw-id", "Scraped Name"); // real title -> rung 4 never touches it
+    const before = structuredClone([present, unknown, scraped]);
+    const after = applyDisplayNames([present, unknown, scraped], names);
     assert.notEqual(after[0], present, "overridden row is a clone");
     assert.equal(after[0]!.quote.slug, "present-id");
     assert.equal(after[0]!.quote.displayName, "Present Name");
-    assert.deepEqual([present, absent], before, "inputs unmutated");
+    assert.notEqual(after[1], unknown, "unknown-slug row is a rung-4 clone");
+    assert.equal(after[1]!.quote.displayName, "Unknown Id");
+    assert.equal(after[2], scraped, "row with a real scraped title is the SAME object");
+    assert.deepEqual([present, unknown, scraped], before, "inputs unmutated");
   });
 
-  it("D13 empty valued and empty map are no-ops", () => {
+  it("D13 empty valued is a no-op; empty map formats unknown rows via rung 4", () => {
     assert.deepEqual(applyDisplayNames([], new Map([["x", "X"]])), []);
-    const v = valued("solo-id");
-    assert.equal(applyDisplayNames([v], new Map())[0], v);
+    const after = applyDisplayNames([valued("solo-id")], new Map());
+    assert.equal(after[0]!.quote.displayName, "Solo Id");
+  });
+});
+
+describe("displayNames — rung 4 mechanical slug formatting", () => {
+  it("D16 capitalizes leading lowercase tokens; digits, dots, and existing casing pass through", () => {
+    assert.equal(formatSlugForDisplay("clef-flash"), "Clef Flash");
+    assert.equal(formatSlugForDisplay("some-5.5-pro"), "Some 5.5 Pro");
+    assert.equal(formatSlugForDisplay("mix_underscore-slug"), "Mix Underscore Slug");
+    assert.equal(formatSlugForDisplay("Already-Title"), "Already Title");
+    assert.equal(formatSlugForDisplay("31b-fast"), "31b Fast");
+    assert.equal(formatSlugForDisplay("solo"), "Solo");
+  });
+
+  it("D17 empty and separator-only slugs return unchanged", () => {
+    assert.equal(formatSlugForDisplay(""), "");
+    assert.equal(formatSlugForDisplay("---"), "---");
+    assert.equal(formatSlugForDisplay("_"), "_");
+  });
+
+  it("D18 brand-new board entry unknown to every rung renders formatted, never as the raw slug", () => {
+    // The clef-flash scenario: on the board, absent from v1/registry/cards.
+    const names = buildDisplayNameMap(null, null, null);
+    const after = applyDisplayNames([valued("clef-flash")], names);
+    assert.equal(after[0]!.quote.displayName, "Clef Flash");
+    assert.equal(after[0]!.quote.slug, "clef-flash", "slug is never rewritten");
   });
 });
 
