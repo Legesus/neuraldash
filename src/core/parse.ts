@@ -120,8 +120,8 @@ function extractSparkline(td: HTMLElement): Sparkline48h | null {
 
   const svgClass = svg.getAttribute("class") ?? "";
   let direction: SparklineDirection = "neutral";
-  if (/\btext-emerald-500\b/.test(svgClass)) direction = "below";
-  else if (/\btext-rose-500\b/.test(svgClass)) direction = "above";
+  if (/\b(text-emerald-500|nw-spark-cheaper)\b/.test(svgClass)) direction = "below";
+  else if (/\b(text-rose-500|nw-spark-pricier)\b/.test(svgClass)) direction = "above";
 
   let maxMwh: number | null = null;
   let minMwh: number | null = null;
