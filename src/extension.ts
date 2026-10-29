@@ -16,6 +16,7 @@ import { Controller } from "./controller";
 import { rankQuotes, bestValueSlug } from "./core/ranking";
 import { applyDisplayNames } from "./core/displayNames";
 import { mergedScores, resolveBundledScoresPath } from "./core/scores";
+import { eciScoreTable } from "./core/eciScores";
 import { resolveSlugArg, buildModelTooltipMd, resolveModelRefArg } from "./core/rowView";
 import { findModelBySlug, buildModelChartHtml } from "./core/chartPanel";
 import { NEURALWATT_URL } from "./providers/neuralwattProvider";
@@ -104,7 +105,7 @@ export function activate(context: vscode.ExtensionContext): void {
       const preferred = vscode.workspace.getConfiguration("neuraldash").get<string>("preferredBand", "typical") as never;
       const bundledPath = resolveBundledScoresPath(context.extensionPath);
       const overridePath = vscode.workspace.getConfiguration("neuraldash").get<string>("scoresOverridePath", "");
-      const table = mergedScores(bundledPath, overridePath);
+      const table = mergedScores(bundledPath, overridePath, eciScoreTable(cached.snapshot.quotes, controller.getEciDoc()));
       const valued = applyDisplayNames(rankQuotes(cached.snapshot.quotes, table, tariff, preferred), controller.boardDisplayNames());
       await pickBestValueQuickPick(valued);
     }),
@@ -118,7 +119,7 @@ export function activate(context: vscode.ExtensionContext): void {
       const preferred = vscode.workspace.getConfiguration("neuraldash").get<string>("preferredBand", "typical") as never;
       const bundledPath = resolveBundledScoresPath(context.extensionPath);
       const overridePath = vscode.workspace.getConfiguration("neuraldash").get<string>("scoresOverridePath", "");
-      const table = mergedScores(bundledPath, overridePath);
+      const table = mergedScores(bundledPath, overridePath, eciScoreTable(cached.snapshot.quotes, controller.getEciDoc()));
       const valued = applyDisplayNames(rankQuotes(cached.snapshot.quotes, table, tariff, preferred), controller.boardDisplayNames());
       const chosen = await pickMyModel(valued);
       if (chosen !== undefined) {

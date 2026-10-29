@@ -50,6 +50,7 @@ export interface ModelQuote {
   // Optional (not required) so pre-existing ModelQuote literals keep compiling;
   // old-cache JSON lacks the field entirely (undefined). Consumers truthy-check.
   sparkline?: Sparkline48h | null;
+  family?: string | null;
   bands: BandEnergy[];
   capturedAt: string;
 }

@@ -17,9 +17,15 @@ import { parseFlexCatalogCards } from "./core/flexCatalogCards";
 import type { FlexCardsDoc } from "./core/flexCatalogCards";
 import { buildDisplayNameMap, applyDisplayNames } from "./core/displayNames";
 import { FlexCatalogCacheManager } from "./core/flexCatalogCache";
+import { eciScoreTable, isEciDoc } from "./core/eciScores";
+import type { EciDoc } from "./core/eciScores";
+import { fetchEpochEci } from "./providers/epochProvider";
 import type { RegistryDataProvider } from "./providers/modelsDevProvider";
 import type { NeuralwattModelsProvider } from "./providers/neuralwattModelsProvider";
 import { NEURALWATT_URL } from "./providers/neuralwattProvider";
+
+const ECI_STATE_KEY = "neuraldash.eciDoc";
+const ECI_REFRESH_MS = 24 * 60 * 60 * 1000;
 
 export class Controller {
   private timer: NodeJS.Timeout | null = null;
@@ -39,6 +45,8 @@ export class Controller {
   private flexCardsFetchedAt: string | null = null;
   private flexCardsHash: string | null = null;
   private flexFetching = false;
+  private eciDoc: EciDoc | null = null;
+  private eciFetching = false;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -94,6 +102,9 @@ export class Controller {
     } catch {
       // corrupt/unreadable flex cache -> empty flex section until first fetch
     }
+
+    const storedEci = this.context.globalState.get<unknown>(ECI_STATE_KEY);
+    if (isEciDoc(storedEci)) this.eciDoc = storedEci;
 
     // stale-first render
     const cached = await this.cache.load();
@@ -158,7 +169,7 @@ export class Controller {
     const preferred = this.readPreferredBand();
     const bundledPath = resolveBundledScoresPath(this.extensionRoot);
     const overridePath = vscode.workspace.getConfiguration("neuraldash").get<string>("scoresOverridePath", "");
-    const table = mergedScores(bundledPath, overridePath);
+    const table = mergedScores(bundledPath, overridePath, eciScoreTable(snapshot.quotes, this.eciDoc));
     const valued = rankQuotes(snapshot.quotes, table, tariff, preferred);
     const best = bestValueSlug(valued);
 
@@ -211,6 +222,7 @@ export class Controller {
       // Registry + flex catalog refreshes ride the board cycle but never block it.
       void this.refreshRegistry();
       void this.refreshFlexCatalog();
+      void this.refreshBenchmarks();
       const cached = await this.cache.load();
       const etag = cached.etag;
       const result = await this.provider.fetchSnapshot(etag);
@@ -348,6 +360,33 @@ export class Controller {
    * the cache slot. The view re-renders only when a document actually
    * changed; otherwise lastCheckedAt is touched.
    */
+  private async refreshBenchmarks(): Promise<void> {
+    if (this.eciFetching) return;
+    const lastAt = this.eciDoc ? Date.parse(this.eciDoc.fetchedAt) : NaN;
+    if (Number.isFinite(lastAt) && Date.now() - lastAt < ECI_REFRESH_MS) return;
+    this.eciFetching = true;
+    try {
+      const result = await fetchEpochEci(this.eciDoc?.contentHash ?? null);
+      if (result.status === "ok") {
+        this.eciDoc = result.doc;
+      } else if (result.status === "notModified" && this.eciDoc) {
+        this.eciDoc = { ...this.eciDoc, fetchedAt: new Date().toISOString() };
+      } else {
+        return;
+      }
+      await this.context.globalState.update(ECI_STATE_KEY, this.eciDoc);
+      await this.rerenderFromCache();
+    } catch {
+      // best-effort: scores stay at last-known
+    } finally {
+      this.eciFetching = false;
+    }
+  }
+
+  getEciDoc(): EciDoc | null {
+    return this.eciDoc;
+  }
+
   private async refreshFlexCatalog(): Promise<void> {
     if (this.flexFetching) return;
     this.flexFetching = true;

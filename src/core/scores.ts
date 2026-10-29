@@ -76,14 +76,17 @@ export function loadOverrideScores(overridePath: string | null | undefined): Sco
   }
 }
 
-export function mergedScores(bundledPath: string, overridePath: string | null | undefined): ScoreTable {
+export function mergedScores(
+  bundledPath: string,
+  overridePath: string | null | undefined,
+  live: Record<string, ScoreEntry> = {},
+): ScoreTable {
   const bundled = loadBundledScores(bundledPath);
   const override = loadOverrideScores(overridePath);
-  if (!override) return bundled;
-  // user-wins per slug
+  // live < bundled < user-wins per slug
   return {
-    version: override.version ?? bundled.version,
-    scores: { ...bundled.scores, ...override.scores },
+    version: override?.version ?? bundled.version,
+    scores: { ...live, ...bundled.scores, ...(override?.scores ?? {}) },
   };
 }
 

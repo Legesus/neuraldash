@@ -28,7 +28,9 @@ Live NeuralWatt **energy-per-request** board inside VS Code. Shows `Right now` a
 
 ## Scores
 
-`data/scores.json` schema:
+Live scores come from the [Epoch Capabilities Index (ECI)](https://epoch.ai/eci), read from Epoch AI's [benchmark data download](https://epoch.ai/benchmarks/use-this-data) (`https://epoch.ai/data/benchmark_data.zip`, `epoch_capabilities_index/eci_scores.csv`) at most once a day. Data © Epoch AI, used under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Board models are matched to ECI rows by normalized name (slug, then display name, then family); ambiguous or unknown models stay `no benchmark`. Each tooltip names the ECI row it used.
+
+Bundled and override scores take precedence over live ECI scores. `data/scores.json` schema:
 
 ```json
 {

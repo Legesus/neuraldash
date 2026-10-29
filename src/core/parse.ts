@@ -280,6 +280,7 @@ function extractBoardRows(board: HTMLElement): Map<string, Partial<ModelQuote>> 
     map.set(slug, {
       displayName,
       slug,
+      family,
       isPreview,
       contextBand,
       cachePct,
@@ -426,6 +427,7 @@ export function parseSnapshot(html: string, sourceUrl: string, fetchedAt?: strin
       typicalMwh: partial.typicalMwh ?? null,
       trend: partial.trend ?? null,
       sparkline: partial.sparkline ?? null,
+      family: partial.family ?? null,
       bands,
       capturedAt: at,
     };
