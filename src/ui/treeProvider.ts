@@ -6,7 +6,7 @@ import type { SeverityScale } from "../core/color";
 import type { FlexEntry, FlexSources, MultiplierOrigin } from "../core/flexCatalog";
 import { formatFlexEntryDescription } from "../core/flexCatalog";
 import { modelRowDescription, tooltipFooter, buildModelTooltipMd, escapeMarkdownLocal } from "../core/rowView";
-import { tierComparisonTable } from "../core/cardFormat";
+import { flexEnergyTable, tierComparisonTable } from "../core/cardFormat";
 import { sortValued, energySortKey } from "../core/ranking";
 import { NEURALWATT_URL } from "../providers/neuralwattProvider";
 import { formatContextTokens } from "../core/flex";
@@ -158,7 +158,14 @@ export class BoardTreeProvider implements vscode.TreeDataProvider<vscode.TreeIte
     lines.push(`\n${tierNotes.join(" · ")}`);
     lines.push(`\n_Membership: ${escapeMarkdownLocal(membershipLabel(entry, this.flexSources))} · Pricing: ${escapeMarkdownLocal(flexSourceLabel(entry, this.flexSources))}_`);
     const updated = entry.lastUpdated ? ` · updated ${escapeMarkdownLocal(entry.lastUpdated)}` : "";
-    lines.push(`\n_No live energy data for Flex rows${updated}_`);
+    const base = this.valued.find((v) => v.quote.slug === entry.baseSlug) ?? null;
+    const energyTable = base ? flexEnergyTable(base.descriptionMwh, base.costPer1kUsd, entry.flexMultiplier) : [];
+    if (energyTable.length > 0) {
+      lines.push("", ...energyTable);
+      lines.push(`\n_Consumed = board right-now for \`${escapeMarkdownLocal(entry.baseSlug)}\` · charged = consumed × Flex multiplier${updated}_`);
+    } else {
+      lines.push(`\n_No live energy data for Flex rows${updated}_`);
+    }
     // Same sticky-hover footer as model rows; isTrusted required for the command: link.
     lines.push(tooltipFooter(NEURALWATT_URL, entry.slug));
     md.value = lines.join("\n");

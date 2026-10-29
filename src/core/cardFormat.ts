@@ -123,3 +123,21 @@ export function tierComparisonTable(rows: TierPrice[]): string[] {
   }
   return lines;
 }
+
+export function flexEnergyTable(
+  consumedMwh: number | null | undefined,
+  normalCostPer1k: number | null | undefined,
+  multiplier: number | null | undefined,
+): string[] {
+  if (consumedMwh == null || !Number.isFinite(consumedMwh) || multiplier == null || !Number.isFinite(multiplier) || !(multiplier > 0)) return [];
+  const chargedMwh = consumedMwh * multiplier;
+  const unit = pickUnit(consumedMwh, chargedMwh);
+  const pct = savingPct(consumedMwh, chargedMwh);
+  const saving = pct == null ? "—" : pct > 0 ? `**−${pct.toFixed(0)}%**` : `${(-pct).toFixed(0)}% more`;
+  const lines = [`| Energy / req | Normal | → Flex | Saving |`, `|---|---:|---:|---:|`];
+  lines.push(`| Charged | ${formatEnergy(consumedMwh, unit)} | ${formatEnergy(chargedMwh, unit)} | ${saving} |`);
+  if (normalCostPer1k != null && Number.isFinite(normalCostPer1k)) {
+    lines.push(`| Cost / 1k req | ${formatPrice(normalCostPer1k)} | ${formatPrice(normalCostPer1k * multiplier)} | ${saving} |`);
+  }
+  return lines;
+}

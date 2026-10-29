@@ -13,6 +13,7 @@ import {
   tierComparisonTable,
   savingPct,
   formatPrice,
+  flexEnergyTable,
 } from "../src/core/cardFormat";
 
 describe("cardFormat — pickUnit", () => {
@@ -225,5 +226,22 @@ describe("cardFormat — formatPrice", () => {
     assert.equal(formatPrice(0.14), "$0.14");
     assert.equal(formatPrice(2), "$2.00");
     assert.equal(formatPrice(null), "—");
+  });
+});
+
+describe("cardFormat — flexEnergyTable", () => {
+  it("charges consumed energy times the fetched multiplier", () => {
+    const m = 0.5;
+    const lines = flexEnergyTable(20, 0.2, m);
+    assert.equal(lines.length, 4);
+    assert.ok(lines[2].includes("20.00 mWh") && lines[2].includes("10.00 mWh") && lines[2].includes("**−50%**"));
+    assert.ok(lines[3].includes("$0.20") && lines[3].includes("$0.10"));
+  });
+
+  it("omits cost row without cost and returns nothing without energy or multiplier", () => {
+    assert.equal(flexEnergyTable(20, null, 0.5).length, 3);
+    assert.deepEqual(flexEnergyTable(null, 0.2, 0.5), []);
+    assert.deepEqual(flexEnergyTable(20, 0.2, null), []);
+    assert.deepEqual(flexEnergyTable(20, 0.2, 0), []);
   });
 });
