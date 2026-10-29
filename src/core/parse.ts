@@ -1,5 +1,6 @@
 import { parse, HTMLElement } from "node-html-parser";
 import { BandEnergy, BandKey, BAND_KEYS, ModelQuote, Snapshot, ParseError, TrendInfo, Sparkline48h, SparklineDirection, SparklinePoint } from "./types";
+import { isContextBandText } from "./cardFormat";
 import { toSlug } from "./registry";
 import { normalizeMwh } from "./energy";
 
@@ -73,10 +74,12 @@ function parseContextBand(tdTextSmall: string | null): string | null {
   // context band looks like "16k–64k" or "1k–4k" — just return first token before any span
   // The div.text-[10px] contains e.g. "16k–64k · 88% cache" — first part is the band
   // We normalize dashes
-  const first = t.split("·")[0].trim().split(/\s+/)[0];
-  if (!first) return null;
-  // normalize en-dash/em-dash to hyphen for storage? Keep as-is but normalized
-  return first.replace(/\u2013/g, "-").replace(/\u2014/g, "-");
+  const band = t
+    .split("·")
+    .map((segment) => segment.trim().split(/\s+/)[0] ?? "")
+    .find((token) => isContextBandText(token));
+  if (!band) return null;
+  return band.replace(/–/g, "-").replace(/—/g, "-");
 }
 
 function isPreviewCell(cell: HTMLElement): boolean {
