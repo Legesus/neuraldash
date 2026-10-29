@@ -18,6 +18,7 @@ media/concept-*.svg
 
 # local guard rails (never ship)
 .githooks/**
+.github/**
 .zcode/**
 
 # repo docs + agent instructions (never ship)
