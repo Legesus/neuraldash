@@ -344,6 +344,14 @@ describe("flexCatalog multiplier ladder", () => {
     id, id, "X", 1000, "flex", mult, input, output, cached,
   ];
 
+  it("carries the base model's standard v1 prices for the Normal → Flex comparison", () => {
+    const doc = parseNeuralwattModels(v1FixtureDoc([std("a", 2, 1, 0.2), flex("a-flex", 0.5, 1.2, 0.6, 0.1), std("b", 4, 2, null), flex("b-flex", 0.5)]));
+    const entries = bySlug(buildFlexCatalog(doc, lanes(), null, null, new Set()));
+    assert.deepEqual(entries.get("a-flex")!.standard, { inputPerMillion: 2, outputPerMillion: 1, cacheReadPerMillion: 0.2, source: "v1-standard" });
+    assert.equal(entries.get("a-flex")!.inputPerMillion, 1.2);
+    assert.deepEqual(entries.get("b-flex")!.standard, { inputPerMillion: 4, outputPerMillion: 2, cacheReadPerMillion: null, source: "v1-standard" });
+  });
+
   it("L1 alias-own beats family-sibling (own rung short-circuits an ambiguous family)", () => {
     const doc = parseNeuralwattModels(
       v1FixtureDoc([std("a", 2, 1, 0.2), flex("a-flex", 0.5), std("b", 4, 2, 0.4), flex("b-flex", 0.9)]),

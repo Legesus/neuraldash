@@ -92,3 +92,34 @@ export function sameEnergy(a: number | null | undefined, b: number | null | unde
 export function isContextBandText(text: string | null | undefined): boolean {
   return text != null && /^\d+[kKmM]?\s*[-–—]\s*\d+[kKmM]?$/.test(text.trim());
 }
+
+export interface TierPrice {
+  label: string;
+  normal: number | null;
+  flex: number | null;
+  digits: number;
+}
+
+export function savingPct(normal: number | null, flex: number | null): number | null {
+  if (normal == null || flex == null || !(normal > 0) || !Number.isFinite(flex)) return null;
+  return ((normal - flex) / normal) * 100;
+}
+
+export function formatPrice(v: number | null, minDigits = 2): string {
+  if (v == null || !Number.isFinite(v)) return "—";
+  const trimmed = v.toFixed(4).replace(/0+$/, "");
+  const decimals = Math.max(minDigits, trimmed.split(".")[1]?.length ?? 0);
+  return `$${v.toFixed(decimals)}`;
+}
+
+export function tierComparisonTable(rows: TierPrice[]): string[] {
+  const usable = rows.filter((r) => r.normal != null || r.flex != null);
+  if (usable.length === 0) return [];
+  const lines = [`| /1M tok | Normal | → Flex | Saving |`, `|---|---:|---:|---:|`];
+  for (const r of usable) {
+    const pct = savingPct(r.normal, r.flex);
+    const saving = pct == null ? "—" : pct > 0 ? `**−${pct.toFixed(0)}%**` : `${(-pct).toFixed(0)}% more`;
+    lines.push(`| ${r.label} | ${formatPrice(r.normal, r.digits)} | ${formatPrice(r.flex, r.digits)} | ${saving} |`);
+  }
+  return lines;
+}

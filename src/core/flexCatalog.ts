@@ -70,6 +70,7 @@ export interface FlexEntry {
   readonly tbdReason?: string | null;
   readonly description: string | null;
   readonly lastUpdated: string | null;
+  readonly standard?: StandardPricing | null;
 }
 
 export interface NeuralwattModelEntry {
@@ -419,6 +420,32 @@ function resolvePricing(
   };
 }
 
+
+export interface StandardPricing {
+  readonly inputPerMillion: number;
+  readonly outputPerMillion: number;
+  readonly cacheReadPerMillion: number | null;
+  readonly source: "v1-standard" | "portal-card";
+}
+
+function resolveStandardPricing(
+  baseSlug: string,
+  byId: ReadonlyMap<string, NeuralwattModelEntry>,
+  cardsDoc: FlexCardsDoc | null,
+): StandardPricing | null {
+  const baseEntry = byId.get(baseSlug) ?? null;
+  const baseRaw = baseEntry ? readEntry(baseEntry) : null;
+  if (baseRaw && baseRaw.input != null && baseRaw.output != null) {
+    return { inputPerMillion: baseRaw.input, outputPerMillion: baseRaw.output, cacheReadPerMillion: baseRaw.cached, source: "v1-standard" };
+  }
+  const card = flexCardById(cardsDoc, baseSlug);
+  const cardIn = finiteOrNull(card?.inputPerMillion);
+  const cardOut = finiteOrNull(card?.outputPerMillion);
+  if (cardIn != null && cardOut != null) {
+    return { inputPerMillion: cardIn, outputPerMillion: cardOut, cacheReadPerMillion: finiteOrNull(card?.cachedInputPerMillion), source: "portal-card" };
+  }
+  return null;
+}
 function sortFlexEntries(list: FlexEntry[]): void {
   list.sort((a, b) => {
     const ai = a.inputPerMillion ?? Infinity;
@@ -502,6 +529,7 @@ export function buildFlexCatalog(
       flexMultiplier: mult.value,
       multiplierOrigin: mult.origin,
       preview: lane?.preview ?? false,
+      standard: resolveStandardPricing(baseSlug, byId, cardsDoc),
     });
   }
 

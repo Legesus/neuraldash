@@ -10,6 +10,9 @@ import {
   rankBands,
   sameEnergy,
   textSparkline,
+  tierComparisonTable,
+  savingPct,
+  formatPrice,
 } from "../src/core/cardFormat";
 
 describe("cardFormat — pickUnit", () => {
@@ -189,5 +192,38 @@ describe("cardFormat — isContextBandText", () => {
     assert.equal(isContextBandText(null), false);
     assert.equal(isContextBandText(undefined), false);
     assert.equal(isContextBandText(""), false);
+  });
+});
+
+describe("cardFormat — tierComparisonTable", () => {
+  it("renders Normal → Flex rows with savings computed from the two prices", () => {
+    const lines = tierComparisonTable([
+      { label: "Input", normal: 2, flex: 1.3, digits: 2 },
+      { label: "Output", normal: 8, flex: null, digits: 2 },
+      { label: "Cache read", normal: null, flex: null, digits: 3 },
+    ]);
+    assert.deepEqual(lines, [
+      "| /1M tok | Normal | → Flex | Saving |",
+      "|---|---:|---:|---:|",
+      "| Input | $2.00 | $1.30 | **−35%** |",
+      "| Output | $8.00 | — | — |",
+    ]);
+  });
+
+  it("returns no lines when neither tier has a price, and flags a flex price above normal", () => {
+    assert.deepEqual(tierComparisonTable([{ label: "Input", normal: null, flex: null, digits: 2 }]), []);
+    assert.equal(savingPct(1, 1.2)! < 0, true);
+    assert.ok(tierComparisonTable([{ label: "Input", normal: 1, flex: 1.2, digits: 2 }])[2].includes("20% more"));
+    assert.equal(savingPct(0, 1), null);
+  });
+});
+
+describe("cardFormat — formatPrice", () => {
+  it("keeps sub-cent precision up to 4 decimals without padding round prices", () => {
+    assert.equal(formatPrice(0.0975), "$0.0975");
+    assert.equal(formatPrice(0.091), "$0.091");
+    assert.equal(formatPrice(0.14), "$0.14");
+    assert.equal(formatPrice(2), "$2.00");
+    assert.equal(formatPrice(null), "—");
   });
 });

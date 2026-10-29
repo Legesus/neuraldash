@@ -6,6 +6,7 @@ import type { SeverityScale } from "../core/color";
 import type { FlexEntry, FlexSources, MultiplierOrigin } from "../core/flexCatalog";
 import { formatFlexEntryDescription } from "../core/flexCatalog";
 import { modelRowDescription, tooltipFooter, buildModelTooltipMd, escapeMarkdownLocal } from "../core/rowView";
+import { tierComparisonTable } from "../core/cardFormat";
 import { sortValued, energySortKey } from "../core/ranking";
 import { NEURALWATT_URL } from "../providers/neuralwattProvider";
 import { formatContextTokens } from "../core/flex";
@@ -143,12 +144,18 @@ export class BoardTreeProvider implements vscode.TreeDataProvider<vscode.TreeIte
     lines.push(`**${escapeMarkdownLocal(entry.name)}** · Flex  \n\`${escapeMarkdownLocal(entry.slug)}\`${subtitle ? ` · ${subtitle}` : ""}`);
     if (entry.description) lines.push(`\n${escapeMarkdownLocal(entry.description)}`);
     lines.push("");
-    lines.push(`| Price | |`);
-    lines.push(`|---|---|`);
-    if (entry.inputPerMillion != null) lines.push(`| **$${escapeMarkdownLocal(entry.inputPerMillion.toFixed(2))}** | input /1M tok |`);
-    if (entry.outputPerMillion != null) lines.push(`| **$${escapeMarkdownLocal(entry.outputPerMillion.toFixed(2))}** | output /1M tok |`);
-    if (entry.cacheReadPerMillion != null) lines.push(`| $${escapeMarkdownLocal(entry.cacheReadPerMillion.toFixed(3))} | cache read /1M tok |`);
-    lines.push(`| ${escapeMarkdownLocal(formatContextTokens(entry.context))} | context tokens |`);
+    const std = entry.standard ?? null;
+    const table = tierComparisonTable([
+      { label: "Input", normal: std?.inputPerMillion ?? null, flex: entry.inputPerMillion, digits: 2 },
+      { label: "Output", normal: std?.outputPerMillion ?? null, flex: entry.outputPerMillion, digits: 2 },
+      { label: "Cache read", normal: std?.cacheReadPerMillion ?? null, flex: entry.cacheReadPerMillion, digits: 2 },
+    ]);
+    if (table.length > 0) lines.push(...table);
+    else lines.push(`_Pricing TBD${entry.tbdReason ? `: ${escapeMarkdownLocal(entry.tbdReason)}` : ""}_`);
+    const tierNotes: string[] = [`${escapeMarkdownLocal(formatContextTokens(entry.context))} context tokens`];
+    if (entry.flexMultiplier != null) tierNotes.push(`Flex multiplier ${escapeMarkdownLocal(String(entry.flexMultiplier))}×`);
+    if (std) tierNotes.push(`Normal from ${std.source === "v1-standard" ? "/v1/models" : "portal /models card"}`);
+    lines.push(`\n${tierNotes.join(" · ")}`);
     lines.push(`\n_Membership: ${escapeMarkdownLocal(membershipLabel(entry, this.flexSources))} · Pricing: ${escapeMarkdownLocal(flexSourceLabel(entry, this.flexSources))}_`);
     const updated = entry.lastUpdated ? ` · updated ${escapeMarkdownLocal(entry.lastUpdated)}` : "";
     lines.push(`\n_No live energy data for Flex rows${updated}_`);
