@@ -167,6 +167,27 @@ describe("parse — fixture (live HTML)", () => {
     assert.equal(flash.cachePct, 88);
   });
 
+  it("reads contextBand and zero cachePct when the slug segment comes first in the sub-line", () => {
+    const small = `<div class="text-[10px] font-mono-data">demo-model &middot; 256\u20131k <span> &middot; 0% cache</span></div>`;
+    const board = `
+    <tr>
+      <td class="px-4 py-3">
+        <div class="font-medium" title="Demo Model">Demo Model</div>
+        ${small}
+      </td>
+      <td class="px-3 py-3 text-right"><span class="num">10 mWh</span></td>
+      <td class="px-3 py-3 text-right"><span class="num">9 mWh</span></td>
+      <td class="px-3 py-3"><div></div></td>
+      <td class="px-3 py-3"><div>48h sparkline</div></td>
+    </tr>`;
+    const grid = syntheticGridRow({ name: "Demo Model", bands: ["10 mWh", null, null, null, null, null, null] });
+    const snap = parseSnapshot(wrapTwoTables(board, grid), sourceUrl);
+    const q = snap.quotes.find((x) => x.slug === "demo-model");
+    assert.ok(q, "demo-model quote found");
+    assert.equal(q!.contextBand, "256-1k");
+    assert.equal(q!.cachePct, 0);
+  });
+
   it("parses right-now and typical with ~ stripped and normalization", () => {
     const snap = parseSnapshot(fixtureHtml(), sourceUrl);
     const flash = snap.quotes.find((q) => q.slug === "deepseek-v4-flash")!;
