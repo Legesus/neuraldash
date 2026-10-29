@@ -2,6 +2,18 @@
 
 All notable changes to NeuralDash are documented here.
 
+## 0.5.0 — 2026-10-29
+
+Benchmarks, a sidebar chart, and redesigned hover cards:
+
+- **Live benchmark scores** — rows are scored with the [Epoch Capabilities Index](https://epoch.ai/eci), read at most daily from Epoch AI's benchmark download (`https://epoch.ai/data/benchmark_data.zip`, `eci_scores.csv`, CC BY 4.0). Board models are matched by normalized slug, display name, then family; ambiguous or unknown models stay `no benchmark`, and fast/speed variants inherit their family score labelled `(family)`. Value ranking (score ÷ mWh) now works out of the box. Bundled and override scores still win per slug.
+- **48h trend in the sidebar** — the chart moved from an editor tab to a `48h Trend` pane under the board. Clicking a model row (or the chart action / tooltip link) shows it there, and it re-renders on every board refresh. The chart is now an inline SVG with 7-day typical and 48h-average reference lines, hi/lo markers, per-point hover values and a low/median/high strip.
+- **Redesigned model hover card** — headline energy with the board's trend badge, a compact energy table, a text sparkline linking to the chart, the top prompt-size bands ranked by traffic share, and an `Updated … · source` footer.
+- **Flex card: Normal → Flex comparison** — per-token price table (input, output, cache read) and a charged-energy table (energy per request and cost per 1k requests), both computed from the `flex_discount_multiplier` in `https://api.neuralwatt.com/v1/models`, which per Neuralwatt's docs applies to token billing, pay-as-you-go energy and subscription allowance drawdown. Provenance collapsed to a single `Sources:` line; full detail stays in `NeuralDash: Debug Flex`.
+- **Board markup fixes** — the energy board now groups models under family headers: rows are named from the header (`Kimi K3 Fast`, `DeepSeek V4 Flash · Speed lane`) and keyed by their real model id; the context band is read from any sub-line segment; 48h trend direction reads the new `nw-spark-cheaper` / `nw-spark-pricier` classes.
+- Cost per 1k requests shows 2 decimals; flex token prices keep up to 4 so sub-cent prices don't round to zero.
+- CI: gitleaks secret scan on push (self-hosted runner).
+
 ## 0.4.17 — 2026-10-19
 
 Board readability for brand-new and fast-lane models:
