@@ -53,16 +53,18 @@ describe("chartPanel — findModelBySlug", () => {
 });
 
 describe("chartPanel — buildModelChartHtml", () => {
-  it("contains the tightened CSP, the PNG img at 400x104, and the model identity", () => {
-    const html = buildModelChartHtml(valued("kimi-k3"), { fetchedAt: "2026-09-07T00:00:00Z", tariff: 10 });
+  it("contains the tightened CSP, the inline SVG chart, and the model identity", () => {
+    const html = buildModelChartHtml(valued("kimi-k3"), { fetchedAt: "2026-09-07T00:00:00Z", tariff: 10, now: new Date("2026-09-07T00:05:00Z") });
     assert.ok(html.includes(`default-src 'none'; img-src data:; style-src 'unsafe-inline';`), "CSP pinned");
     assert.ok(!html.includes("https:"), "no https: in img-src");
-    assert.ok(html.includes("data:image/png;base64,"), "PNG chart embedded");
-    assert.ok(html.includes(`width="400" height="104"`), "panel display size pinned");
+    assert.ok(html.includes(`<svg class="trend-chart"`), "inline SVG chart embedded");
+    assert.ok(!html.includes("<img"), "no raster chart");
     assert.ok(html.includes("Model kimi-k3"), "displayName present");
-    assert.ok(html.includes("slug: kimi-k3"), "slug present");
-    assert.ok(html.includes("Last updated: 2026-09-07T00:00:00Z"), "fetched-at footer present");
+    assert.ok(html.includes("<code>kimi-k3</code>"), "slug present");
+    assert.ok(html.includes("Updated 5m ago"), "relative fetched-at footer present");
+    assert.ok(html.includes("2026-09-07T00:00:00Z"), "exact fetched-at kept");
     assert.ok(html.includes("enableScripts") === false, "no scripts marker in static HTML");
+    assert.ok(!html.includes("<script"), "no script tags");
   });
 
   it("escapes <script> payloads in displayName and slug (XSS boundary)", () => {
@@ -74,12 +76,10 @@ describe("chartPanel — buildModelChartHtml", () => {
     assert.ok(html.includes("&lt;script&gt;"), "payload escaped");
   });
 
-  it("renders only the chart img from numeric spark data — no raw user fields in HTML", () => {
-    const v = valued("kimi-k3");
-    const html = buildModelChartHtml(v, { fetchedAt: null, tariff: 10 });
-    assert.ok(!html.includes("Last updated"), "null fetchedAt skips the footer line");
-    const imgs = html.match(/<img /g) ?? [];
-    assert.equal(imgs.length, 1, "exactly one chart img");
+  it("renders exactly one chart from numeric spark data and skips the footer without fetchedAt", () => {
+    const html = buildModelChartHtml(valued("kimi-k3"), { fetchedAt: null, tariff: 10 });
+    assert.ok(!html.includes("Updated"), "null fetchedAt skips the footer line");
+    assert.equal((html.match(/<svg /g) ?? []).length, 1, "exactly one chart svg");
   });
 
   it("missing spark yields an honest no-data message and no chart img", () => {

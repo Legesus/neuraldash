@@ -8,10 +8,12 @@
  * boundary; the chart `<img>` is generated exclusively from numeric
  * sparkline data by the existing pure builders (base64 alphabet).
  */
-import type { ValuedQuote } from "./types";
-import { costPer1kUsd, formatMwh } from "./energy";
+import type { SparklineDirection, TrendInfo, ValuedQuote } from "./types";
+import { costPer1kUsd, humanizeAge } from "./energy";
+import { boardTrendLabel, formatEnergy } from "./cardFormat";
+import { buildTrendChartSvg, formatHoursAgo, summarizeTrend, TREND_CHART_CSS } from "./chartSvg";
 import { TREND_COLORS, trendArrow } from "./sparkline";
-import { buildSparklineImgTag } from "./rowView";
+import { sourceLabel } from "./rowView";
 
 /** Local HTML escaper (same 3-replace shape as the extension.ts helper). */
 function escapeHtml(text: string): string {
@@ -31,41 +33,68 @@ export function findModelBySlug(valued: ValuedQuote[], slug: string): ValuedQuot
 }
 
 export interface ChartPanelOptions {
-  /** Snapshot fetchedAt for the `_Last updated_` line; null skips it. */
   fetchedAt: string | null;
-  /** Tariff for the Cost/1k stat. */
   tariff: number;
+  sourceUrl?: string | null;
+  now?: Date;
 }
 
-/**
- * Assemble the full WebviewPanel document for one model row: identity
- * header, colored trend line + lo/hi range + stats, the 400x104 PNG chart
- * (or an honest no-data message), and the fetched-at footer.
- * CSP is `default-src 'none'` with `img-src data:` only; no scripts.
- */
+const PANEL_CSS =
+  `body{font-family:var(--vscode-font-family,system-ui,sans-serif);padding:16px 20px;color:var(--vscode-foreground,#ccc);background:var(--vscode-editor-background,#1e1e1e);}` +
+  `h2{margin:0;font-size:1.3em;}p{margin:4px 0;}.meta{color:var(--vscode-descriptionForeground,#888);}` +
+  `.headline{display:flex;flex-wrap:wrap;gap:6px 18px;align-items:baseline;margin:12px 0 16px;}` +
+  `.headline .now{font-size:1.6em;font-weight:600;}` +
+  `.stats{display:flex;flex-wrap:wrap;gap:6px 24px;margin:12px 0;}.stats b{font-weight:600;}` +
+  TREND_CHART_CSS;
+
+function directionWord(dir: SparklineDirection): string {
+  return dir === "above" ? "above 48h avg" : dir === "below" ? "below 48h avg" : "in line with 48h avg";
+}
+
+function boardTrendColor(trend: TrendInfo | null): string {
+  if (!trend || trend.direction === "inline") return TREND_COLORS.neutral;
+  return TREND_COLORS[trend.direction];
+}
+
 export function buildModelChartHtml(v: ValuedQuote, opts: ChartPanelOptions): string {
-  const spark = v.quote.sparkline;
-  const dir = spark?.direction ?? "neutral";
-  const dirWord = dir === "above" ? "above avg" : dir === "below" ? "below avg" : "in line with avg";
-  const rangePart =
-    spark != null && spark.minMwh != null && spark.maxMwh != null
-      ? ` · lo ${formatMwh(spark.minMwh)} – hi ${formatMwh(spark.maxMwh)}`
-      : "";
-  const stats: string[] = [`Right now ${formatMwh(v.quote.rightNowMwh)}`, `Typical (7d) ${formatMwh(v.quote.typicalMwh)}`];
+  const q = v.quote;
+  const spark = q.sparkline ?? null;
+  const summary = summarizeTrend(spark);
+
+  const headline: string[] = [`<span class="now">${formatEnergy(q.rightNowMwh)}</span><span class="meta">right now</span>`];
+  const boardTrend = boardTrendLabel(q.trend);
+  if (boardTrend) headline.push(`<span style="color:${boardTrendColor(q.trend)};font-weight:600;">${escapeHtml(boardTrend)}</span>`);
+  headline.push(`<span>${formatEnergy(q.typicalMwh)} <span class="meta">7d typical</span></span>`);
+  if (spark) headline.push(`<span style="color:${TREND_COLORS[spark.direction]};">${trendArrow(spark.direction)} ${directionWord(spark.direction)}</span>`);
   const cost = costPer1kUsd(v.descriptionMwh, opts.tariff);
-  if (cost != null && v.descriptionMwh != null) stats.push(`Cost/1k $${cost.toFixed(2)}`);
-  const img = buildSparklineImgTag(spark, { w: 400, h: 104 }) ?? `<p>No 48h trend data available for this model.</p>`;
-  const fetched = opts.fetchedAt ? `<p class="meta">Last updated: ${escapeHtml(opts.fetchedAt)}</p>` : "";
+  if (cost != null && v.descriptionMwh != null) headline.push(`<span>$${cost.toFixed(2)} <span class="meta">/1k requests</span></span>`);
+  if (q.cachePct != null) headline.push(`<span>${q.cachePct}% <span class="meta">cache</span></span>`);
+
+  const chart = buildTrendChartSvg(spark, { typicalMwh: q.typicalMwh }) ?? `<p>No 48h trend data available for this model.</p>`;
+
+  const stats = summary
+    ? `<div class="stats"><span>Low <b>${formatEnergy(summary.low.mwh)}</b> <span class="meta">${formatHoursAgo(summary.low.hoursAgo)}</span></span>` +
+      `<span>Median <b>${formatEnergy(summary.median)}</b></span>` +
+      `<span>High <b>${formatEnergy(summary.high.mwh)}</b> <span class="meta">${formatHoursAgo(summary.high.hoursAgo)}</span></span>` +
+      `<span class="meta">${summary.samples.length} samples</span></div>`
+    : "";
+
+  const footerParts: string[] = [];
+  if (opts.fetchedAt) footerParts.push(`Updated ${escapeHtml(humanizeAge(opts.fetchedAt, opts.now))}`);
+  if (opts.sourceUrl) footerParts.push(escapeHtml(sourceLabel(opts.sourceUrl)));
+  if (opts.fetchedAt) footerParts.push(escapeHtml(opts.fetchedAt));
+  const footer = footerParts.length > 0 ? `<p class="meta">${footerParts.join(" · ")}</p>` : "";
+
   return (
-    `<!DOCTYPE html><html><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline';">` +
-    `<style>body{font-family:var(--font-family,system-ui,sans-serif);padding:12px;color:var(--vscode-foreground,#ccc);` +
-    `background:var(--vscode-editor-background,#1e1e1e);}h3{margin:0 0 4px;}p{margin:4px 0;}.meta{color:var(--vscode-descriptionForeground,#888);}</style>` +
+    `<!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline';">` +
+    `<style>${PANEL_CSS}</style>` +
     `</head><body>` +
-    `<h3>${escapeHtml(v.quote.displayName)}</h3>` +
-    `<p class="meta"><code>slug: ${escapeHtml(v.quote.slug)}</code></p>` +
-    `<p><span style="color:${TREND_COLORS[dir]};font-weight:600;">${trendArrow(dir)} ${dirWord}</span>${rangePart} · ${stats.join(" · ")}</p>` +
-    `${img}` +
-    `${fetched}` +
+    `<h2>${escapeHtml(q.displayName)}</h2>` +
+    `<p class="meta"><code>${escapeHtml(q.slug)}</code></p>` +
+    `<div class="headline">${headline.join("")}</div>` +
+    chart +
+    stats +
+    footer +
     `</body></html>`
   );
 }

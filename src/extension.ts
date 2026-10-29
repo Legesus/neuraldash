@@ -67,6 +67,7 @@ export function activate(context: vscode.ExtensionContext): void {
     const html = buildModelChartHtml(v, {
       fetchedAt: board.snapshot ? board.snapshot.fetchedAt : null,
       tariff: board.tariff,
+      sourceUrl: board.snapshot ? board.snapshot.sourceUrl : null,
     });
     if (!chartPanel) {
       chartPanel = vscode.window.createWebviewPanel("neuraldash.modelChart", title, vscode.ViewColumn.Beside, { enableScripts: false });
