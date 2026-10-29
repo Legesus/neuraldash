@@ -236,6 +236,7 @@ describe("cardFormat — flexEnergyTable", () => {
     assert.equal(lines.length, 4);
     assert.ok(lines[2].includes("20.00 mWh") && lines[2].includes("10.00 mWh") && lines[2].includes("**−50%**"));
     assert.ok(lines[3].includes("$0.20") && lines[3].includes("$0.10"));
+    assert.ok(flexEnergyTable(267.44, 2.6744, 0.65)[3].includes("$2.67 | $1.74"));
   });
 
   it("omits cost row without cost and returns nothing without energy or multiplier", () => {

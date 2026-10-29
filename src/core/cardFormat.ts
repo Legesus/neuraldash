@@ -105,9 +105,9 @@ export function savingPct(normal: number | null, flex: number | null): number | 
   return ((normal - flex) / normal) * 100;
 }
 
-export function formatPrice(v: number | null, minDigits = 2): string {
+export function formatPrice(v: number | null, minDigits = 2, maxDigits = 4): string {
   if (v == null || !Number.isFinite(v)) return "—";
-  const trimmed = v.toFixed(4).replace(/0+$/, "");
+  const trimmed = v.toFixed(maxDigits).replace(/0+$/, "");
   const decimals = Math.max(minDigits, trimmed.split(".")[1]?.length ?? 0);
   return `$${v.toFixed(decimals)}`;
 }
@@ -137,7 +137,7 @@ export function flexEnergyTable(
   const lines = [`| Energy / req | Normal | → Flex | Saving |`, `|---|---:|---:|---:|`];
   lines.push(`| Charged | ${formatEnergy(consumedMwh, unit)} | ${formatEnergy(chargedMwh, unit)} | ${saving} |`);
   if (normalCostPer1k != null && Number.isFinite(normalCostPer1k)) {
-    lines.push(`| Cost / 1k req | ${formatPrice(normalCostPer1k)} | ${formatPrice(normalCostPer1k * multiplier)} | ${saving} |`);
+    lines.push(`| Cost / 1k req | ${formatPrice(normalCostPer1k, 2, 2)} | ${formatPrice(normalCostPer1k * multiplier, 2, 2)} | ${saving} |`);
   }
   return lines;
 }

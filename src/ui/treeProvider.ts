@@ -156,7 +156,6 @@ export class BoardTreeProvider implements vscode.TreeDataProvider<vscode.TreeIte
     if (entry.flexMultiplier != null) tierNotes.push(`Flex multiplier ${escapeMarkdownLocal(String(entry.flexMultiplier))}×`);
     if (std) tierNotes.push(`Normal from ${std.source === "v1-standard" ? "/v1/models" : "portal /models card"}`);
     lines.push(`\n${tierNotes.join(" · ")}`);
-    lines.push(`\n_Membership: ${escapeMarkdownLocal(membershipLabel(entry, this.flexSources))} · Pricing: ${escapeMarkdownLocal(flexSourceLabel(entry, this.flexSources))}_`);
     const updated = entry.lastUpdated ? ` · updated ${escapeMarkdownLocal(entry.lastUpdated)}` : "";
     const base = this.valued.find((v) => v.quote.slug === entry.baseSlug) ?? null;
     const energyTable = base ? flexEnergyTable(base.descriptionMwh, base.costPer1kUsd, entry.flexMultiplier) : [];
@@ -166,6 +165,7 @@ export class BoardTreeProvider implements vscode.TreeDataProvider<vscode.TreeIte
     } else {
       lines.push(`\n_No live energy data for Flex rows${updated}_`);
     }
+    lines.push(`\n_Membership: ${escapeMarkdownLocal(membershipLabel(entry, this.flexSources))} · Pricing: ${escapeMarkdownLocal(flexSourceLabel(entry, this.flexSources))}_`);
     // Same sticky-hover footer as model rows; isTrusted required for the command: link.
     lines.push(tooltipFooter(NEURALWATT_URL, entry.slug));
     md.value = lines.join("\n");
