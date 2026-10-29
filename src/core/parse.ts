@@ -138,6 +138,35 @@ function extractSparkline(td: HTMLElement): Sparkline48h | null {
   return { points, refY, direction, maxMwh, minMwh };
 }
 
+function familyHeaderName(row: HTMLElement): string | null {
+  const cell = row.querySelector("td[colspan]");
+  const nameEl = cell?.querySelector("span.font-semibold") ?? cell?.querySelector("span");
+  const name = nameEl ? cleanText(nameEl) : "";
+  return name || null;
+}
+
+interface FamilyRowIdentity {
+  displayName: string;
+  slug: string;
+  isModel: boolean;
+}
+
+function familyRowIdentity(firstCell: HTMLElement, family: string, familyModelIndex: number): FamilyRowIdentity | null {
+  const nameDiv = firstCell.querySelector("div.font-medium");
+  if (!nameDiv) return null;
+  const link = nameDiv.querySelector("a");
+  const linkText = link ? cleanText(link).replace(/^↳\s*/, "") : "";
+  const titleSlug = nameDiv.getAttribute("title")?.trim();
+  if (titleSlug) {
+    const displayName = familyModelIndex === 0 || !linkText ? family : `${family} ${linkText}`;
+    return { displayName, slug: titleSlug, isModel: true };
+  }
+  if (!linkText) return null;
+  const tag = firstCell.querySelector(".nw-tag");
+  const tagText = tag ? cleanText(tag) : "";
+  return { displayName: `${family} · ${tagText || linkText}`, slug: linkText, isModel: false };
+}
+
 function extractBoardRows(board: HTMLElement): Map<string, Partial<ModelQuote>> {
   const tbody = board.querySelector("tbody");
   const container = tbody ?? board;
@@ -157,20 +186,38 @@ function extractBoardRows(board: HTMLElement): Map<string, Partial<ModelQuote>> 
 
   const map = new Map<string, Partial<ModelQuote>>();
 
+  let family: string | null = null;
+  let familyModelIndex = 0;
+
   for (const row of rows) {
     const cells = row.querySelectorAll("td");
-    if (cells.length < 2) continue;
+    if (cells.length < 2) {
+      const header = familyHeaderName(row);
+      if (header) {
+        family = header;
+        familyModelIndex = 0;
+      }
+      continue;
+    }
     // name = td[0] div.font-medium[title] @title else text
     const firstCell = cells[0];
-    const nameEl = firstCell.querySelector("div.font-medium[title]") ?? firstCell.querySelector("div[title]");
+    const identity = family ? familyRowIdentity(firstCell, family, familyModelIndex) : null;
     let displayName = "";
-    if (nameEl) {
-      const titleAttr = nameEl.getAttribute("title");
-      displayName = (titleAttr ?? cleanText(nameEl)).trim();
+    let explicitSlug: string | null = null;
+    if (identity) {
+      displayName = identity.displayName;
+      explicitSlug = identity.slug;
+      if (identity.isModel) familyModelIndex++;
     } else {
-      // fallback: first div text
-      const fallback = firstCell.querySelector("div");
-      displayName = cleanText(fallback ?? firstCell);
+      const nameEl = firstCell.querySelector("div.font-medium[title]") ?? firstCell.querySelector("div[title]");
+      if (nameEl) {
+        const titleAttr = nameEl.getAttribute("title");
+        displayName = (titleAttr ?? cleanText(nameEl)).trim();
+      } else {
+        // fallback: first div text
+        const fallback = firstCell.querySelector("div");
+        displayName = cleanText(fallback ?? firstCell);
+      }
     }
     if (!displayName) continue;
 
@@ -225,7 +272,7 @@ function extractBoardRows(board: HTMLElement): Map<string, Partial<ModelQuote>> 
       }
     }
 
-    const slug = toSlug(displayName);
+    const slug = explicitSlug ?? toSlug(displayName);
 
     let sparkline: Sparkline48h | null = null;
     if (cells.length >= 5) sparkline = extractSparkline(cells[4]);

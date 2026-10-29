@@ -188,6 +188,21 @@ describe("parse — fixture (live HTML)", () => {
     assert.equal(q!.cachePct, 0);
   });
 
+  it("names family-grouped rows from the family header and keeps the title id as slug", () => {
+    const cells = `<td><span class="num">10 mWh</span></td><td><span class="num">9 mWh</span></td><td><div></div></td><td><div></div></td>`;
+    const board = `
+    <tr class="bg-nw-surface-2"><td colspan="5"><span class="font-semibold">Demo Family 2.1</span><span>Acme &middot; 2 model IDs</span></td></tr>
+    <tr><td><div class="font-medium" title="demo-2.1"><a href="/models/demo-2.1">Standard</a></div><div class="text-[10px] nw-num">demo-2.1 &middot; 4k–16k<span> &middot; 50% cache</span></div></td>${cells}</tr>
+    <tr><td><div class="font-medium"><span aria-hidden="true">&#8627;</span><a href="/models/demo-2.1#area-lanes">demo-2.1-speed</a></div><div><span class="nw-tag nw-tag-sm">Speed lane</span></div></td>${cells}</tr>
+    <tr><td><div class="font-medium" title="demo-2.1-fast"><a href="/models/demo-2.1-fast">Fast</a></div></td>${cells}</tr>`;
+    const snap = parseSnapshot(wrapTwoTables(board, ""), sourceUrl);
+    const bySlug = new Map(snap.quotes.map((q) => [q.slug, q]));
+    assert.equal(bySlug.get("demo-2.1")?.displayName, "Demo Family 2.1");
+    assert.equal(bySlug.get("demo-2.1")?.contextBand, "4k-16k");
+    assert.equal(bySlug.get("demo-2.1-speed")?.displayName, "Demo Family 2.1 · Speed lane");
+    assert.equal(bySlug.get("demo-2.1-fast")?.displayName, "Demo Family 2.1 Fast");
+  });
+
   it("parses right-now and typical with ~ stripped and normalization", () => {
     const snap = parseSnapshot(fixtureHtml(), sourceUrl);
     const flash = snap.quotes.find((q) => q.slug === "deepseek-v4-flash")!;
