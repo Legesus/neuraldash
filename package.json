@@ -28,6 +28,7 @@
   ],
   "activationEvents": [
     "onView:neuralwatt.board",
+    "onView:neuraldash.chart",
     "onCommand:neuraldash.refresh",
     "onCommand:neuraldash.sortByEnergy",
     "onCommand:neuraldash.sortByValue",
@@ -57,6 +58,11 @@
           "type": "tree",
           "id": "neuralwatt.board",
           "name": "Energy Board"
+        },
+        {
+          "type": "webview",
+          "id": "neuraldash.chart",
+          "name": "48h Trend"
         }
       ]
     },
@@ -104,7 +110,7 @@
       },
       {
         "command": "neuraldash.openModelChart",
-        "title": "NeuralDash: Open 48h Trend Chart",
+        "title": "NeuralDash: Show 48h Trend",
         "category": "NeuralDash",
         "icon": "$(pulse)"
       },

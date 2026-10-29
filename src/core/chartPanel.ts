@@ -37,6 +37,7 @@ export interface ChartPanelOptions {
   tariff: number;
   sourceUrl?: string | null;
   now?: Date;
+  compact?: boolean;
 }
 
 const PANEL_CSS =
@@ -46,6 +47,19 @@ const PANEL_CSS =
   `.headline .now{font-size:1.6em;font-weight:600;}` +
   `.stats{display:flex;flex-wrap:wrap;gap:6px 24px;margin:12px 0;}.stats b{font-weight:600;}` +
   TREND_CHART_CSS;
+
+const COMPACT_CSS =
+  `body{padding:8px 12px;background:transparent;}h2{font-size:1.1em;}` +
+  `.headline{gap:4px 12px;margin:8px 0 10px;}.headline .now{font-size:1.3em;}.stats{gap:4px 14px;margin:8px 0;}`;
+
+const CSP_META = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline';">`;
+
+export function buildChartPlaceholderHtml(message: string): string {
+  return (
+    `<!DOCTYPE html><html><head><meta charset="utf-8">${CSP_META}<style>${PANEL_CSS}${COMPACT_CSS}</style></head>` +
+    `<body><p class="meta">${escapeHtml(message)}</p></body></html>`
+  );
+}
 
 function directionWord(dir: SparklineDirection): string {
   return dir === "above" ? "above 48h avg" : dir === "below" ? "below 48h avg" : "in line with 48h avg";
@@ -70,7 +84,7 @@ export function buildModelChartHtml(v: ValuedQuote, opts: ChartPanelOptions): st
   if (cost != null && v.descriptionMwh != null) headline.push(`<span>$${cost.toFixed(2)} <span class="meta">/1k requests</span></span>`);
   if (q.cachePct != null) headline.push(`<span>${q.cachePct}% <span class="meta">cache</span></span>`);
 
-  const chart = buildTrendChartSvg(spark, { typicalMwh: q.typicalMwh }) ?? `<p>No 48h trend data available for this model.</p>`;
+  const chart = buildTrendChartSvg(spark, opts.compact ? { typicalMwh: q.typicalMwh, width: 420, height: 220 } : { typicalMwh: q.typicalMwh }) ?? `<p>No 48h trend data available for this model.</p>`;
 
   const stats = summary
     ? `<div class="stats"><span>Low <b>${formatEnergy(summary.low.mwh)}</b> <span class="meta">${formatHoursAgo(summary.low.hoursAgo)}</span></span>` +
@@ -86,8 +100,8 @@ export function buildModelChartHtml(v: ValuedQuote, opts: ChartPanelOptions): st
   const footer = footerParts.length > 0 ? `<p class="meta">${footerParts.join(" · ")}</p>` : "";
 
   return (
-    `<!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline';">` +
-    `<style>${PANEL_CSS}</style>` +
+    `<!DOCTYPE html><html><head><meta charset="utf-8">${CSP_META}` +
+    `<style>${PANEL_CSS}${opts.compact ? COMPACT_CSS : ""}</style>` +
     `</head><body>` +
     `<h2>${escapeHtml(q.displayName)}</h2>` +
     `<p class="meta"><code>${escapeHtml(q.slug)}</code></p>` +

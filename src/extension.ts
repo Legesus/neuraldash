@@ -18,7 +18,7 @@ import { applyDisplayNames } from "./core/displayNames";
 import { mergedScores, resolveBundledScoresPath } from "./core/scores";
 import { eciScoreTable } from "./core/eciScores";
 import { resolveSlugArg, buildModelTooltipMd, resolveModelRefArg } from "./core/rowView";
-import { findModelBySlug, buildModelChartHtml } from "./core/chartPanel";
+import { ChartViewProvider, CHART_VIEW_ID } from "./ui/chartView";
 import { NEURALWATT_URL } from "./providers/neuralwattProvider";
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -52,34 +52,10 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push({ dispose: () => controller.dispose() });
   void controller.activate();
 
-  // Single reused chart panel (proven debug-panel rendering path): reopening
-  // another model swaps title + content in place; dispose clears the ref.
-  // No serializer — content is trivially regenerable; an open panel does NOT
-  // live-update on board refresh (reopen to refresh).
-  let chartPanel: vscode.WebviewPanel | undefined;
+  const chartView = new ChartViewProvider(tree);
+  context.subscriptions.push(vscode.window.registerWebviewViewProvider(CHART_VIEW_ID, chartView));
   const showModelChart = (slug: string): void => {
-    const board = tree.getBoardData();
-    const v = findModelBySlug(board.valued, slug);
-    if (!v) {
-      void vscode.window.showInformationMessage(`No board data for "${slug}" — refresh first`);
-      return;
-    }
-    const title = `48h Trend — ${v.quote.displayName}`;
-    const html = buildModelChartHtml(v, {
-      fetchedAt: board.snapshot ? board.snapshot.fetchedAt : null,
-      tariff: board.tariff,
-      sourceUrl: board.snapshot ? board.snapshot.sourceUrl : null,
-    });
-    if (!chartPanel) {
-      chartPanel = vscode.window.createWebviewPanel("neuraldash.modelChart", title, vscode.ViewColumn.Beside, { enableScripts: false });
-      chartPanel.onDidDispose(() => {
-        chartPanel = undefined;
-      }, null, context.subscriptions);
-    } else {
-      chartPanel.title = title;
-      chartPanel.reveal(vscode.ViewColumn.Beside);
-    }
-    chartPanel.webview.html = html;
+    void chartView.show(slug);
   };
 
   context.subscriptions.push(

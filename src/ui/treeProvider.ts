@@ -219,7 +219,7 @@ export class BoardTreeProvider implements vscode.TreeDataProvider<vscode.TreeIte
     md.isTrusted = true;
     item.tooltip = md;
 
-    item.command = undefined;
+    item.command = { command: "neuraldash.openModelChart", title: "Show 48h trend", arguments: [v.quote.slug] };
 
     return item;
   }

@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import type { ValuedQuote } from "../src/core/types";
-import { findModelBySlug, buildModelChartHtml } from "../src/core/chartPanel";
+import { findModelBySlug, buildModelChartHtml, buildChartPlaceholderHtml } from "../src/core/chartPanel";
 
 function spark(over?: Record<string, unknown>) {
   return {
@@ -87,5 +87,19 @@ describe("chartPanel — buildModelChartHtml", () => {
     const html = buildModelChartHtml(v, { fetchedAt: null, tariff: 10 });
     assert.ok(html.includes("No 48h trend data available for this model."), "honest no-data message");
     assert.ok(!html.includes("<img"), "no chart img without spark data");
+  });
+
+  it("compact mode sizes the chart for the sidebar and keeps the CSP", () => {
+    const html = buildModelChartHtml(valued("kimi-k3"), { fetchedAt: null, tariff: 10, compact: true });
+    assert.ok(html.includes(`viewBox="0 0 420 220"`), "sidebar-sized chart");
+    assert.ok(html.includes("background:transparent"), "blends into the sidebar");
+    assert.ok(html.includes(`default-src 'none'`), "CSP kept");
+  });
+
+  it("placeholder escapes its message and has no chart", () => {
+    const html = buildChartPlaceholderHtml(`No board data for "<b>x</b>"`);
+    assert.ok(html.includes("&lt;b&gt;x&lt;/b&gt;"));
+    assert.ok(!html.includes("<svg"));
+    assert.ok(html.includes(`default-src 'none'`));
   });
 });
