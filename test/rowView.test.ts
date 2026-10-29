@@ -232,18 +232,58 @@ describe("rowView — buildModelTooltipMd (debugTooltip extraction)", () => {
   it("builds the exact tooltip markdown: text trend row + Open-chart link, no <img>", () => {
     const md = buildModelTooltipMd(valued(), { fetchedAt: "2026-09-04T00:00:00Z", isBest: false, pricingUrl: "https://portal.neuralwatt.com/energy-pricing", tariff: 10 });
     assert.ok(!md.includes("<img"), "hover tooltip must never embed an image");
-    assert.ok(md.includes("| 48h trend | "), "trend row present");
-    assert.ok(md.includes("[Open 48h chart](command:neuraldash.openModelChart?"), "chart link present");
+    assert.match(md, /\| [▁▂▃▄▅▆▇█]{16} \| 48h · 8\.88–51\.26 mWh · /, "48h row with text sparkline and shared-unit range");
+    assert.ok(md.includes("[Open chart](command:neuraldash.openModelChart?"), "chart link present");
     const arg = md.match(/command:neuraldash\.openModelChart\?([^)]+)\)/)![1];
     assert.equal((JSON.parse(decodeURIComponent(arg)) as { slug: string }).slug, "kimi-k3", "chart arg resolves to the row slug");
-    assert.ok(md.includes("slug: kimi-k3"), "header slug present");
+    assert.ok(md.includes("`kimi-k3`"), "header slug present");
     assert.ok(md.includes("command:neuraldash.copySlug"), "sticky-hover footer present");
   });
 
   it("buildModelTooltipMd omits the trend row without spark, keeps footer sticky", () => {
     const md = buildModelTooltipMd(valued({ quote: { sparkline: null } }), { fetchedAt: null, isBest: false, pricingUrl: "https://portal.neuralwatt.com/energy-pricing", tariff: 10 });
-    assert.ok(!md.includes("48h trend"), "no trend row without spark data");
+    assert.ok(!md.includes("48h"), "no trend row without spark data");
     assert.ok(md.includes("command:neuraldash.copySlug"), "footer keeps the hover sticky");
+  });
+
+  it("drops rows that say nothing: basis equal to typical, missing benchmark, non-band context", () => {
+    const md = buildModelTooltipMd(valued({ quote: { contextBand: "kimi-k3" } }), { fetchedAt: null, isBest: false, pricingUrl: "https://portal.neuralwatt.com/energy-pricing", tariff: 10 });
+    assert.ok(!md.includes("ranking basis"));
+    assert.ok(!md.includes("no benchmark"));
+    assert.ok(!md.includes("typical prompt size"));
+    const withBand = buildModelTooltipMd(valued({ basisMwh: 30, quote: { contextBand: "16k-64k" } }), { fetchedAt: null, isBest: false, pricingUrl: "https://portal.neuralwatt.com/energy-pricing", tariff: 10 });
+    assert.ok(withBand.includes("| 30.00 mWh | ranking basis |"));
+    assert.ok(withBand.includes("| 16k-64k | typical prompt size |"));
+  });
+
+  it("labels the board trend against 7d and shows relative update time with the source", () => {
+    const md = buildModelTooltipMd(valued({ quote: { trend: { pct: 23, direction: "below" } } }), {
+      fetchedAt: "2026-09-04T00:00:00Z",
+      isBest: false,
+      pricingUrl: "https://portal.neuralwatt.com/energy-pricing",
+      tariff: 10,
+      now: new Date("2026-09-04T00:04:00Z"),
+    });
+    assert.ok(md.includes("▼ 23% vs 7d</span>"));
+    assert.ok(md.includes("_Updated 4m ago · portal.neuralwatt.com/energy-pricing · 2026-09-04T00:00:00Z_"));
+  });
+
+  it("ranks bands by share, hides empty bands, and folds the tail", () => {
+    const bands = [
+      { band: "0-256", mwh: 129.44, sharePct: 3.8 },
+      { band: "256-1k", mwh: 109.12, sharePct: 16.9 },
+      { band: "1k-4k", mwh: 677.44, sharePct: 7.5 },
+      { band: "4k-16k", mwh: 795.1, sharePct: 14.1 },
+      { band: "16k-64k", mwh: 886.84, sharePct: 42.1 },
+      { band: "64k-256k", mwh: 1110, sharePct: 15.5 },
+      { band: "256k-1M", mwh: null, sharePct: null },
+    ];
+    const md = buildModelTooltipMd(valued({ quote: { bands } }), { fetchedAt: null, isBest: false, pricingUrl: "https://portal.neuralwatt.com/energy-pricing", tariff: 10 });
+    const rows = md.split("\n").filter((l) => /^\| \d/.test(l) && l.includes("%"));
+    assert.deepEqual(rows.map((r) => r.split("|")[1].trim()), ["16k-64k", "256-1k", "64k-256k", "4k-16k"]);
+    assert.ok(rows[0].includes("| 0.89 Wh |"), "band energies share one unit");
+    assert.ok(md.includes("_…2 more size bands_"));
+    assert.ok(!md.includes("256k-1M"));
   });
 
   it("buildSparklineImgTag builds the PNG img tag from spark data, null when unusable", () => {

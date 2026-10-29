@@ -6,10 +6,11 @@
  * Old-cache contract: every function here keys off sparkline presence, so a
  * pre-feature snapshot (field undefined) renders exactly the legacy output.
  */
-import type { Sparkline48h, TrendInfo, ValuedQuote } from "./types";
+import type { Sparkline48h, SparklineDirection, TrendInfo, ValuedQuote } from "./types";
+import { boardTrendLabel, formatEnergy, formatEnergyRange, isContextBandText, pickUnit, rankBands, sameEnergy, textSparkline } from "./cardFormat";
 import type { SeverityScale } from "./color";
 import { basisToSvgUri } from "./color";
-import { costPer1kUsd, formatMwh } from "./energy";
+import { costPer1kUsd, formatMwh, humanizeAge } from "./energy";
 import { TREND_COLORS, trendArrow, sparklineCardSvg, sparklineIconSvg, sparklineDescriptionSuffix } from "./sparkline";
 import { sparklineToPngBytes } from "./sparklinePng";
 
@@ -100,52 +101,88 @@ export function sparklineTooltipRow(spark: Sparkline48h | null | undefined, slug
  */
 export function buildModelTooltipMd(
   v: ValuedQuote,
-  opts: { fetchedAt: string | null; isBest: boolean; pricingUrl: string; tariff: number },
+  opts: { fetchedAt: string | null; isBest: boolean; pricingUrl: string; tariff: number; now?: Date },
 ): string {
+  const q = v.quote;
   const mwh = v.descriptionMwh;
   const cost = costPer1kUsd(mwh, opts.tariff);
-  const headerBase = `**${escapeMarkdownLocal(v.quote.displayName)}**  \n\`slug: ${escapeMarkdownLocal(v.quote.slug)}\``;
   const lines: string[] = [];
-  lines.push(headerBase);
+
+  const boardTrend = boardTrendLabel(q.trend);
+  const trendBadge = boardTrend
+    ? ` · <span style="color:${TREND_COLORS[boardTrendDirection(q.trend)]};">${boardTrend}</span>`
+    : "";
+  lines.push(`**${escapeMarkdownLocal(q.displayName)}**${trendBadge}  \n\`${escapeMarkdownLocal(q.slug)}\``);
   if (opts.isBest) lines.push(`\n$(star-full) **Best value**`);
   lines.push("");
-  lines.push(`| Field | Value |`);
+
+  lines.push(`| Energy | |`);
   lines.push(`|---|---|`);
-  const rightNowStr = formatMwh(v.quote.rightNowMwh);
-  const typicalStr = formatMwh(v.quote.typicalMwh);
-  const basisStr = v.basisMwh != null ? formatMwh(v.basisMwh) : "—";
-  lines.push(`| Right now | ${rightNowStr} |`);
-  lines.push(`| Typical (7d) | ${typicalStr} |`);
-  lines.push(`| Basis | ${basisStr} |`);
-  if (cost != null && mwh != null) lines.push(`| Cost/1k | $${cost.toFixed(2)} |`);
-  if (v.quote.trend) {
-    const arrow = v.quote.trend.direction === "above" ? "▲" : v.quote.trend.direction === "below" ? "▼" : "—";
-    lines.push(`| Trend | ${arrow} ${v.quote.trend.pct}% ${escapeMarkdownLocal(v.quote.trend.direction)} |`);
+  lines.push(`| **${formatEnergy(q.rightNowMwh)}** | right now |`);
+  const typicalExtras = [`7d typical`];
+  if (cost != null && mwh != null) typicalExtras.push(`$${cost.toFixed(2)}/1k`);
+  if (q.cachePct != null) typicalExtras.push(`${q.cachePct}% cache`);
+  lines.push(`| ${formatEnergy(q.typicalMwh)} | ${typicalExtras.join(" · ")} |`);
+  if (v.basisMwh != null && !sameEnergy(v.basisMwh, q.typicalMwh)) {
+    lines.push(`| ${formatEnergy(v.basisMwh)} | ranking basis |`);
   }
-  const sparkRow = sparklineTooltipRow(v.quote.sparkline, v.quote.slug);
-  if (sparkRow) lines.push(sparkRow);
-  if (v.quote.cachePct != null) lines.push(`| Cache | ${v.quote.cachePct}% |`);
-  if (v.quote.contextBand) {
-    lines.push(`| Context | ${escapeMarkdownLocal(v.quote.contextBand)} |`);
+  const trendRow = sparklineCardRow(q.sparkline, q.slug);
+  if (trendRow) lines.push(trendRow);
+  if (isContextBandText(q.contextBand)) {
+    lines.push(`| ${escapeMarkdownLocal(q.contextBand!)} | typical prompt size |`);
   }
+
   if (v.score) {
-    lines.push(`| Score | ${v.score.performanceScore} (${escapeMarkdownLocal(v.score.source)}) |`);
-  }
-  if (v.value != null) lines.push(`| Value | ${v.value.toFixed(4)} (score/mWh) |`);
-  else lines.push(`| Value | no benchmark |`);
-  if (v.quote.bands.length > 0) {
+    const parts = [`Score ${v.score.performanceScore} (${escapeMarkdownLocal(v.score.source)})`];
+    if (v.value != null) parts.push(`${v.value.toFixed(4)} score/mWh`);
     lines.push("");
-    lines.push(`| Band | Energy | Share |`);
-    lines.push(`|---|---|---|`);
-    for (const b of v.quote.bands) {
-      const em = b.mwh != null ? formatMwh(b.mwh) : "—";
-      const s = b.sharePct != null ? `${b.sharePct.toFixed(1)}%` : "—";
-      lines.push(`| ${escapeMarkdownLocal(b.band)} | ${em} | ${s} |`);
-    }
+    lines.push(`**Benchmark** · ${parts.join(" · ")}`);
   }
-  if (opts.fetchedAt) lines.push(`\n_Last updated: ${escapeMarkdownLocal(opts.fetchedAt)}_`);
-  lines.push(tooltipFooter(opts.pricingUrl, v.quote.slug));
+
+  const { shown, hiddenCount } = rankBands(q.bands);
+  if (shown.length > 0) {
+    const unit = pickUnit(...shown.map((b) => b.mwh));
+    lines.push("");
+    lines.push(`| Prompt size | Traffic | Share | Energy |`);
+    lines.push(`|---|---|---:|---:|`);
+    for (const b of shown) {
+      lines.push(`| ${escapeMarkdownLocal(b.band)} | ${b.bar} | ${b.sharePct.toFixed(0)}% | ${formatEnergy(b.mwh, unit)} |`);
+    }
+    if (hiddenCount > 0) lines.push(`\n_…${hiddenCount} more size ${hiddenCount === 1 ? "band" : "bands"}_`);
+  }
+
+  if (opts.fetchedAt) {
+    const age = humanizeAge(opts.fetchedAt, opts.now);
+    lines.push(`\n_Updated ${escapeMarkdownLocal(age)} · ${escapeMarkdownLocal(sourceLabel(opts.pricingUrl))} · ${escapeMarkdownLocal(opts.fetchedAt)}_`);
+  }
+  lines.push(tooltipFooter(opts.pricingUrl, q.slug));
   return lines.join("\n");
+}
+
+function boardTrendDirection(trend: TrendInfo | null): SparklineDirection {
+  if (!trend || trend.direction === "inline") return "neutral";
+  return trend.direction;
+}
+
+function sparklineCardRow(spark: Sparkline48h | null | undefined, slug: string): string | null {
+  if (!spark) return null;
+  const glyphs = textSparkline(spark.points) ?? "48h";
+  const dirWord = spark.direction === "above" ? "above avg" : spark.direction === "below" ? "below avg" : "in line with avg";
+  const parts = [`48h`];
+  const range = formatEnergyRange(spark.minMwh, spark.maxMwh);
+  if (range) parts.push(range);
+  parts.push(`<span style="color:${TREND_COLORS[spark.direction]};">${trendArrow(spark.direction)} ${dirWord}</span>`);
+  if (slug) parts.push(`[Open chart](command:neuraldash.openModelChart?${encodeCommandArg({ slug })})`);
+  return `| ${glyphs} | ${parts.join(" · ")} |`;
+}
+
+export function sourceLabel(url: string): string {
+  try {
+    const u = new URL(url);
+    return `${u.host}${u.pathname}`;
+  } catch {
+    return url;
+  }
 }
 
 /**

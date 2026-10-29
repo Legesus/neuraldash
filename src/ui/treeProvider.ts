@@ -139,21 +139,19 @@ export class BoardTreeProvider implements vscode.TreeDataProvider<vscode.TreeIte
 
     const md = new vscode.MarkdownString(undefined, true);
     const lines: string[] = [];
-    lines.push(`**${escapeMarkdownLocal(entry.name)}**  \n\`slug: ${escapeMarkdownLocal(entry.slug)}\``);
+    const subtitle = [entry.provider, entry.family].filter((s): s is string => !!s).map(escapeMarkdownLocal).join(" · ");
+    lines.push(`**${escapeMarkdownLocal(entry.name)}** · Flex  \n\`${escapeMarkdownLocal(entry.slug)}\`${subtitle ? ` · ${subtitle}` : ""}`);
+    if (entry.description) lines.push(`\n${escapeMarkdownLocal(entry.description)}`);
     lines.push("");
-    lines.push(`| Field | Value |`);
+    lines.push(`| Price | |`);
     lines.push(`|---|---|`);
-    lines.push(`| Provider | ${escapeMarkdownLocal(entry.provider)} |`);
-    lines.push(`| Family | ${escapeMarkdownLocal(entry.family ?? "-")} |`);
-    lines.push(`| Context | ${escapeMarkdownLocal(formatContextTokens(entry.context))} tokens |`);
-    lines.push(`| Input | ${entry.inputPerMillion == null ? "-" : `$${escapeMarkdownLocal(entry.inputPerMillion.toFixed(2))} /1M tok`} |`);
-    lines.push(`| Output | ${entry.outputPerMillion == null ? "-" : `$${escapeMarkdownLocal(entry.outputPerMillion.toFixed(2))} /1M tok`} |`);
-    if (entry.cacheReadPerMillion != null) lines.push(`| Cache read | $${escapeMarkdownLocal(entry.cacheReadPerMillion.toFixed(3))} |`);
-    if (entry.description) lines.push(`| Description | ${escapeMarkdownLocal(entry.description)} |`);
-    if (entry.lastUpdated) lines.push(`| Last updated | ${escapeMarkdownLocal(entry.lastUpdated)} |`);
-    lines.push(`| Membership | ${escapeMarkdownLocal(membershipLabel(entry, this.flexSources))} |`);
-    lines.push(`| Pricing | ${escapeMarkdownLocal(flexSourceLabel(entry, this.flexSources))} |`);
-    lines.push(`\n_Flex pricing from model catalog — no live energy data_`);
+    if (entry.inputPerMillion != null) lines.push(`| **$${escapeMarkdownLocal(entry.inputPerMillion.toFixed(2))}** | input /1M tok |`);
+    if (entry.outputPerMillion != null) lines.push(`| **$${escapeMarkdownLocal(entry.outputPerMillion.toFixed(2))}** | output /1M tok |`);
+    if (entry.cacheReadPerMillion != null) lines.push(`| $${escapeMarkdownLocal(entry.cacheReadPerMillion.toFixed(3))} | cache read /1M tok |`);
+    lines.push(`| ${escapeMarkdownLocal(formatContextTokens(entry.context))} | context tokens |`);
+    lines.push(`\n_Membership: ${escapeMarkdownLocal(membershipLabel(entry, this.flexSources))} · Pricing: ${escapeMarkdownLocal(flexSourceLabel(entry, this.flexSources))}_`);
+    const updated = entry.lastUpdated ? ` · updated ${escapeMarkdownLocal(entry.lastUpdated)}` : "";
+    lines.push(`\n_No live energy data for Flex rows${updated}_`);
     // Same sticky-hover footer as model rows; isTrusted required for the command: link.
     lines.push(tooltipFooter(NEURALWATT_URL, entry.slug));
     md.value = lines.join("\n");
