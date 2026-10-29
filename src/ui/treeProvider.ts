@@ -3,7 +3,7 @@ import type { Snapshot, ValuedQuote, SortOrder } from "../core/types";
 import { costPer1kUsd } from "../core/energy";
 import { computeSeverityScale, basisToSvgUri } from "../core/color";
 import type { SeverityScale } from "../core/color";
-import type { FlexEntry, FlexSources, MultiplierOrigin } from "../core/flexCatalog";
+import type { FlexEntry, FlexSources } from "../core/flexCatalog";
 import { formatFlexEntryDescription } from "../core/flexCatalog";
 import { modelRowDescription, tooltipFooter, buildModelTooltipMd, escapeMarkdownLocal } from "../core/rowView";
 import { flexEnergyTable, tierComparisonTable } from "../core/cardFormat";
@@ -165,7 +165,7 @@ export class BoardTreeProvider implements vscode.TreeDataProvider<vscode.TreeIte
     } else {
       lines.push(`\n_No live energy data for Flex rows${updated}_`);
     }
-    lines.push(`\n_Membership: ${escapeMarkdownLocal(membershipLabel(entry, this.flexSources))} · Pricing: ${escapeMarkdownLocal(flexSourceLabel(entry, this.flexSources))}_`);
+    lines.push(`\n_${escapeMarkdownLocal(flexSourcesLine(entry, this.flexSources))}_`);
     // Same sticky-hover footer as model rows; isTrusted required for the command: link.
     lines.push(tooltipFooter(NEURALWATT_URL, entry.slug));
     md.value = lines.join("\n");
@@ -225,74 +225,32 @@ export class BoardTreeProvider implements vscode.TreeDataProvider<vscode.TreeIte
   }
 }
 
-function fetchedStamp(at: string | null | undefined): string {
-  return at ? `fetched ${at}` : "fetched \u2014";
+function shortStamp(iso: string | null | undefined): string {
+  const m = iso ? /^\d{4}-(\d{2}-\d{2})T(\d{2}:\d{2})/.exec(iso) : null;
+  return m ? `${m[1]} ${m[2]}` : "time unknown";
 }
 
-/** Human label for the multiplier ladder rung that supplied the value. */
-function multiplierOriginLabel(origin: MultiplierOrigin | null | undefined): string {
-  switch (origin) {
-    case "alias-own":
-      return "alias-own multiplier";
-    case "family-sibling":
-      return "family-sibling multiplier";
-    case "doc-harvest":
-      return "doc-wide multiplier";
-    default:
-      return "multiplier unavailable";
-  }
-}
-
-/**
- * Tooltip Membership line: which fetched document(s) establish the row and
- * when each was last fetched.
- */
-function membershipLabel(entry: FlexEntry, sources: FlexSources | null): string {
-  const v1At = fetchedStamp(sources?.v1?.fetchedAt);
-  const perfAt = fetchedStamp(sources?.perf?.fetchedAt);
-  switch (entry.membership) {
-    case "both":
-      return `portal perf view flex lane (${perfAt}) + /v1/models flex alias (${v1At})`;
-    case "perf-lane":
-      return `portal perf view flex lane (${perfAt})`;
-    case "v1-alias":
-      return `/v1/models flex alias (${v1At})`;
-  }
-}
-
-/**
- * Tooltip Pricing line: names the DOCUMENT behind the price and its fetchedAt.
- * "v1-alias" = exact prices straight from /v1/models (already discounted;
- * never re-multiplied); "models-dev" = the models.dev alias row; "v1-derived"
- * = /v1/models standard base x the documented multiplier (value + rung shown);
- * "portal-card" = portal /models family card x the documented multiplier —
- * card input is exact but the footer output is display-rounded (caveat shown;
- * the CARDS document's fetchedAt is stamped, not the v1 one); "tbd" = no
- * published pricing, with the reason the chain recorded.
- */
-function flexSourceLabel(entry: FlexEntry, sources: FlexSources | null): string {
-  const stamp = sources?.v1?.fetchedAt ? `; fetched ${sources.v1.fetchedAt}` : "";
-  const cardsStamp = sources?.cards?.fetchedAt ? `; fetched ${sources.cards.fetchedAt}` : "";
+function flexPricingKind(entry: FlexEntry): string {
   switch (entry.provenance) {
     case "v1-alias":
-      return `Neuralwatt /v1/models flex alias (exact flex pricing${stamp})`;
+      return "exact";
+    case "v1-derived":
+    case "portal-card":
+      return "derived";
     case "models-dev":
-      return "models.dev display price";
-    case "v1-derived": {
-      const origin = multiplierOriginLabel(entry.multiplierOrigin);
-      return entry.flexMultiplier != null
-        ? `derived from /v1/models standard \u00d7 ${entry.flexMultiplier}\u00d7 (${origin}${stamp})`
-        : `derived from /v1/models standard (${origin}${stamp})`;
-    }
-    case "portal-card": {
-      const origin = multiplierOriginLabel(entry.multiplierOrigin);
-      return entry.flexMultiplier != null
-        ? `derived from portal /models card \u00d7 ${entry.flexMultiplier}\u00d7 (${origin}; input exact, output display-rounded${cardsStamp})`
-        : `derived from portal /models card (${origin}; input exact, output display-rounded${cardsStamp})`;
-    }
+      return "models.dev";
     case "tbd":
-      return entry.tbdReason ?? (entry.preview ? "preview \u2014 no published pricing (TBD)" : "no published pricing (TBD)");
+      return "TBD";
   }
+}
+
+function flexSourcesLine(entry: FlexEntry, sources: FlexSources | null): string {
+  const parts: string[] = [];
+  if (entry.membership !== "v1-alias") parts.push(`perf view ${shortStamp(sources?.perf?.fetchedAt)}`);
+  const usesV1 = entry.membership !== "perf-lane" || entry.provenance === "v1-alias" || entry.provenance === "v1-derived";
+  if (usesV1) parts.push(`/v1/models ${shortStamp(sources?.v1?.fetchedAt)}`);
+  if (entry.provenance === "portal-card") parts.push(`/models card ${shortStamp(sources?.cards?.fetchedAt)}`);
+  return `Sources: ${parts.join(" · ")} · pricing ${flexPricingKind(entry)}`;
 }
 
 /**
