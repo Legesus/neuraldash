@@ -2,6 +2,8 @@
 
 Live NeuralWatt **energy-per-request** board inside VS Code. Shows `Right now` and `7-day typical` energy, per-size breakdowns, 48-hour trend charts, and a value ranking (`performanceScore / mWh`) with status-bar pinning.
 
+> **Unofficial.** NeuralDash is an independent community extension and is not affiliated with or endorsed by Neuralwatt. It only reads Neuralwatt's public pricing pages and the public `/v1/models` catalog; it sends no data and needs no account or API key.
+
 <!-- Preview screenshot lives at docs/prototype-48h-trend.png — re-enable this image once the project has a public repository URL (vsce resolves README images against it). -->
 
 ## Features

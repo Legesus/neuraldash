@@ -62,6 +62,19 @@ The board is scraped from Neuralwatt's **energy-pricing HTML page**; energy pric
 - vsce gotchas hit here: README images require the `repository` field; CHANGELOG gets lowercased in the package; LICENSE is renamed `LICENSE.txt` inside the VSIX; untracked dot-dirs get swept into the package — keep `.vscodeignore` current.
 - Publishing flow: bump version → CHANGELOG → `vsce package` → GitHub Release → Open VSX (web dialog or `ovsx`). The Marketplace listing is blocked on Microsoft's "suspicious content" flag (manual review via VSMarketplace@microsoft.com) — do not retry rapid re-uploads.
 
+### Marketplace scanner hygiene
+
+The Marketplace runs an automated malware scan on every upload, and false positives come from code that *looks like* malware. Each change must keep the package boring to that scanner:
+
+- **No obfuscation or minification.** Ship readable `tsc` output only. Never add a bundler/minifier step without a deliberate decision.
+- **No dynamic code:** no `eval`, `new Function`, `vm`, `child_process`, or runtime `require` of computed paths.
+- **No needless base64.** Encode SVG data URIs with `encodeURIComponent`. Base64 is allowed only for binary PNG payloads that require it.
+- **Network calls stay fixed and readable:** use public HTTPS endpoint constants named in source. Never build URLs from fetched content, download executables or archives to run, or write outside extension storage.
+- **Minimal dependencies.** Every runtime dependency gets scanned. Add one only when it's needed, keep it current, and prune unused ones (`npm ls --omit=dev`).
+- **Inspect the VSIX before upload:** `npx vsce ls` must list only `out/`, `media/`, the manifest, docs, and runtime `node_modules`, with no secrets, scratch files, or dot-dirs. Use the latest `vsce`, which also scans for secrets.
+- **Unofficial branding.** The README and description must say the extension is not affiliated with Neuralwatt, and must not use the Neuralwatt logo as the icon.
+- **After a flag:** do not re-upload repeatedly. Email VSMarketplace@microsoft.com with the publisher, extension ID, repo link, and a plain list of what the extension fetches and why, then wait for the human review.
+
 ## Platform quirks
 
 **Windows / Git Bash**

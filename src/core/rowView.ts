@@ -54,14 +54,14 @@ export function buildSparklineImgTag(
   // PNG form: VS Code blocks SVG images in TreeItem tooltip MarkdownStrings
   // (by design) but renders `data:image/png;base64` images. Base64 uses a
   // restricted alphabet, so the URI is table-safe by construction.
-  // The SVG-base64 path is the fallback when the rasterizer returns null
+  // The URL-encoded SVG path is the fallback when the rasterizer returns null
   // (defense in depth — sparklineToPngBytes and sparklineCardSvg share the
   // same usability gate, so for a valid spark the PNG path always wins).
   const png = sparklineToPngBytes(spark);
   const src = png
     ? `data:image/png;base64,${png.toString("base64")}`
     : card
-      ? `data:image/svg+xml;base64,${Buffer.from(card, "utf8").toString("base64")}`
+      ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(card).replace(/\(/g, "%28").replace(/\)/g, "%29")}`
       : null;
   return src ? `<img src="${src}" width="${w}" height="${h}"><br>` : null;
 }
