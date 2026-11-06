@@ -79,9 +79,12 @@ function priceAttrPerMillion(card: HTMLElement): number | null {
 /** The pricing footer's output span; the stats-tile label is bare ("Output", no colon/$), so this is unique in the card. */
 const OUTPUT_SPAN = /^Output:\s*\$([0-9]+(?:\.[0-9]+)?)\/M$/;
 
+const LISTED_IN_OUT_SPAN = /^\$[0-9]+(?:\.[0-9]+)?\s+in\s*\/\s*\$([0-9]+(?:\.[0-9]+)?)\s+out\s+per\s+1M\s+tokens$/;
+
 function outputSpanPerMillion(card: HTMLElement): number | null {
   for (const span of card.querySelectorAll("span")) {
-    const m = span.text.trim().match(OUTPUT_SPAN);
+    const text = span.text.trim().replace(/\s+/g, " ");
+    const m = text.match(OUTPUT_SPAN) ?? text.match(LISTED_IN_OUT_SPAN);
     if (m) {
       const n = Number(m[1]);
       return Number.isFinite(n) && n >= 0 ? n : null;
@@ -99,6 +102,25 @@ function cachedTitlePerMillion(card: HTMLElement): number | null {
     if (m) {
       const n = Number(m[1]);
       if (Number.isFinite(n) && n >= 0) return n;
+    }
+  }
+  return cachedLabelPerMillion(card);
+}
+
+const CACHED_LABEL = /^Cached input token price$/i;
+const PER_MILLION_VALUE = /^\$([0-9]+(?:\.[0-9]+)?)\s+per\s+1M\s+tokens$/;
+
+function cachedLabelPerMillion(card: HTMLElement): number | null {
+  for (const label of card.querySelectorAll("span")) {
+    if (!CACHED_LABEL.test(label.text.trim())) continue;
+    let sib = label.nextElementSibling;
+    while (sib) {
+      const m = sib.text.trim().replace(/\s+/g, " ").match(PER_MILLION_VALUE);
+      if (m) {
+        const n = Number(m[1]);
+        return Number.isFinite(n) && n >= 0 ? n : null;
+      }
+      sib = sib.nextElementSibling;
     }
   }
   return null;

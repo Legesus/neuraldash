@@ -138,3 +138,24 @@ describe("flexCatalogCards.flexCardById", () => {
     assert.ok(flexCardById(doc, "deepseek-v4.1-flash"));
   });
 });
+
+describe("parseFlexCatalogCards — listed-price detail rows", () => {
+  const html = `<article data-family="Fam A" data-name="Fam A" data-flex="1" data-price="0.00015">
+    <a href="/models/model-a" data-model-id="model-a">model-a</a>
+    <div data-detail-row="listed"><span>Listed token price</span><span>$0.15 in / $0.60 out per 1M tokens</span></div>
+    <div data-detail-row="cached"><span class="text-nw-fg3">Cached input token price</span><span>$0.015 per 1M tokens</span></div>
+  </article>`;
+
+  it("reads output from the in/out span and cached input from the labelled row", () => {
+    const doc = parseFlexCatalogCards(html);
+    assert.ok(doc);
+    assert.deepEqual(doc.cards[0], {
+      ids: ["model-a"],
+      family: "Fam A",
+      name: "Fam A",
+      inputPerMillion: 0.15,
+      outputPerMillion: 0.6,
+      cachedInputPerMillion: 0.015,
+    });
+  });
+});

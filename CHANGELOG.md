@@ -2,6 +2,13 @@
 
 All notable changes to NeuralDash are documented here.
 
+## 0.5.1 — 2026-11-07
+
+Fixes for the redesigned Neuralwatt portal:
+
+- **Board restored** — `/energy-pricing` now opens on a performance view by default, which left the board with no energy values. NeuralDash now fetches `https://portal.neuralwatt.com/energy-pricing?view=energy` explicitly.
+- **/models card prices** — the portal's price footer changed to `$X in / $Y out per 1M tokens` with a separate cached-input row. The card parser (`https://portal.neuralwatt.com/models`) reads both the new and old layouts, so the Flex price fallback works again.
+
 ## 0.5.0 — 2026-10-29
 
 Benchmarks, a sidebar chart, and redesigned hover cards:

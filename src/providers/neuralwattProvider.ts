@@ -1,7 +1,7 @@
 import type { DataProvider, ProviderResult } from "../core/types";
 import { parseSnapshot } from "../core/parse";
 
-export const NEURALWATT_URL = "https://portal.neuralwatt.com/energy-pricing";
+export const NEURALWATT_URL = "https://portal.neuralwatt.com/energy-pricing?view=energy";
 const UA = "NeuralDash/0.1.0 (+VSCode)";
 
 export class NeuralwattProvider implements DataProvider {
