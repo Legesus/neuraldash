@@ -23,5 +23,6 @@ media/concept-*.svg
 
 # repo docs + agent instructions (never ship)
 AGENTS.md
+CONTRIBUTING.md
 WRITEUP.md
 docs/**
