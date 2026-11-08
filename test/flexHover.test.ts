@@ -223,3 +223,16 @@ describe("flexHover - thinking line on Flex hovers", () => {
     assert.ok(!md.includes("<img"), "no raw html survives");
   });
 });
+
+describe("flexHover - same-weights thinking note on Flex hovers", () => {
+  it("renders the note for an unsupported Flex-row thinking info", () => {
+    const map = buildThinkingMap({
+      data: [
+        { id: "lane-fast", metadata: { huggingface_id: "weights-shared", capabilities: { reasoning: false } } },
+        { id: "base-a", metadata: { huggingface_id: "weights-shared", reasoning: { mandatory: false, default_enabled: true, default_effort: "high", supported_efforts: ["max", "high"] } } },
+      ],
+    } as unknown as NeuralwattModelsDoc);
+    const md = buildFlexTooltipMd(entry(), sources(), boardRow(), { pricingUrl: PRICING_URL, thinking: map.get("lane-fast") ?? null });
+    assert.ok(md.includes("**Thinking** \u00b7 not available \u00b7 same weights: on by default (high) \u00b7 /v1/models"), md);
+  });
+});

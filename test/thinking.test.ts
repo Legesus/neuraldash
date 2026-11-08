@@ -340,3 +340,189 @@ describe("thinking - review fixes", () => {
     );
   });
 });
+
+describe("thinking - same-weights note on lanes with thinking off", () => {
+  function onEntry(
+    id: string,
+    hf: string,
+    over?: { mandatory?: boolean; defaultEffort?: string; efforts?: string[] },
+  ): Record<string, unknown> {
+    return {
+      id,
+      metadata: {
+        huggingface_id: hf,
+        reasoning: {
+          mandatory: over?.mandatory ?? false,
+          default_enabled: true,
+          default_effort: over?.defaultEffort ?? "high",
+          supported_efforts: over?.efforts ?? ["max", "high", "low"],
+        },
+      },
+    };
+  }
+
+  function offEntry(id: string, hf: string | null): Record<string, unknown> {
+    const metadata: Record<string, unknown> = { capabilities: { reasoning: false } };
+    if (hf != null) metadata.huggingface_id = hf;
+    return { id, metadata };
+  }
+
+  function laneValued(slug: string): ValuedQuote {
+    return {
+      quote: {
+        displayName: "Lane Fast",
+        slug,
+        isPreview: false,
+        contextBand: null,
+        cachePct: null,
+        rightNowMwh: 5,
+        typicalMwh: 4,
+        trend: null,
+        bands: [],
+        capturedAt: "2026-11-08T00:00:00Z",
+      },
+      basisMwh: 4,
+      score: null,
+      value: null,
+      costPer1kUsd: null,
+      descriptionMwh: 5,
+    };
+  }
+
+  it("attaches the agreeing supported sibling to a thinking-off lane sharing huggingface_id", () => {
+    const map = buildThinkingMap(doc([
+      offEntry("lane-fast", "weights-shared"),
+      onEntry("base-a", "weights-shared"),
+      offEntry("other-slow", null),
+    ]));
+    const fast = map.get("lane-fast");
+    assert.equal(fast?.supported, false);
+    assert.deepEqual(fast?.sameWeights, {
+      mandatory: false,
+      defaultEnabled: true,
+      defaultEffort: "high",
+      efforts: ["max", "high", "low"],
+    });
+    assert.equal(map.get("base-a")?.sameWeights, undefined);
+    assert.equal(map.get("other-slow")?.sameWeights, undefined);
+  });
+
+  it("formats the note after the own not-available statement, reusing the state wording", () => {
+    const map = buildThinkingMap(doc([offEntry("lane-fast", "w"), onEntry("base-a", "w")]));
+    assert.equal(
+      formatThinkingLine(map.get("lane-fast")!),
+      "**Thinking** \u00b7 not available \u00b7 same weights: on by default (high) \u00b7 /v1/models",
+    );
+  });
+
+  it("always-on sibling wording", () => {
+    const map = buildThinkingMap(doc([
+      offEntry("lane-fast", "w"),
+      onEntry("base-a", "w", { mandatory: true, defaultEffort: "max", efforts: ["max", "high"] }),
+    ]));
+    assert.equal(
+      formatThinkingLine(map.get("lane-fast")!),
+      "**Thinking** \u00b7 not available \u00b7 same weights: always on (max) \u00b7 /v1/models",
+    );
+  });
+
+  it("off-by-default sibling omits the default effort in the note", () => {
+    const map = buildThinkingMap(doc([
+      offEntry("lane-fast", "w"),
+      {
+        id: "base-a",
+        metadata: { huggingface_id: "w", reasoning: { mandatory: false, default_enabled: false, default_effort: "high", supported_efforts: ["max", "none"] } },
+      },
+    ]));
+    assert.equal(
+      formatThinkingLine(map.get("lane-fast")!),
+      "**Thinking** \u00b7 not available \u00b7 same weights: off by default \u00b7 /v1/models",
+    );
+  });
+
+  it("no note when supported siblings disagree on default effort", () => {
+    const map = buildThinkingMap(doc([
+      offEntry("lane-fast", "w"),
+      onEntry("base-a", "w"),
+      onEntry("base-b", "w", { defaultEffort: "low" }),
+    ]));
+    assert.equal(map.get("lane-fast")?.sameWeights, undefined);
+  });
+
+  it("no note when supported siblings disagree on efforts", () => {
+    const map = buildThinkingMap(doc([
+      offEntry("lane-fast", "w"),
+      onEntry("base-a", "w"),
+      onEntry("base-b", "w", { efforts: ["max", "high"] }),
+    ]));
+    assert.equal(map.get("lane-fast")?.sameWeights, undefined);
+  });
+
+  it("no note when no same-weights entry supports thinking", () => {
+    const map = buildThinkingMap(doc([
+      offEntry("lane-fast", "w"),
+      offEntry("lane-slow", "w"),
+    ]));
+    assert.equal(map.size, 2);
+    assert.equal(map.get("lane-fast")?.sameWeights, undefined);
+  });
+
+  it("siblings without thinking data are ignored and do not block a lone supported one", () => {
+    const map = buildThinkingMap(doc([
+      offEntry("lane-fast", "w"),
+      { id: "silent-base", metadata: { huggingface_id: "w", display_name: "Silent" } },
+      onEntry("base-a", "w"),
+    ]));
+    assert.equal(map.size, 2);
+    assert.deepEqual(map.get("lane-fast")?.sameWeights, {
+      mandatory: false,
+      defaultEnabled: true,
+      defaultEffort: "high",
+      efforts: ["max", "high", "low"],
+    });
+  });
+
+  it("no note when the model itself supports thinking", () => {
+    const map = buildThinkingMap(doc([
+      onEntry("model-on", "w"),
+      onEntry("base-b", "w"),
+    ]));
+    assert.equal(map.get("model-on")?.supported, true);
+    assert.equal(map.get("model-on")?.sameWeights, undefined);
+    assert.equal(map.get("base-b")?.sameWeights, undefined);
+  });
+
+  it("missing, empty or non-string huggingface_id forms no group", () => {
+    const map = buildThinkingMap(doc([
+      offEntry("lane-fast", null),
+      onEntry("base-a", ""),
+      { id: "lane-mid", metadata: { huggingface_id: 42, capabilities: { reasoning: false } } },
+      onEntry("base-b", "real-group"),
+    ]));
+    for (const id of ["lane-fast", "base-a", "lane-mid", "base-b"]) {
+      assert.equal(map.get(id)?.sameWeights, undefined, id);
+    }
+  });
+
+  it("escapes hostile sibling catalog strings in the note", () => {
+    const map = buildThinkingMap(doc([
+      offEntry("lane-fast", "w"),
+      onEntry("base-a", "w", { defaultEffort: "<b>&x" }),
+    ]));
+    const line = formatThinkingLine(map.get("lane-fast")!);
+    assert.ok(line.includes("same weights: on by default (&lt;b&gt;&amp;x)"), line);
+    assert.ok(!line.includes("<b>"), line);
+  });
+
+  it("model hover renders the note through the shared formatter", () => {
+    const map = buildThinkingMap(doc([offEntry("lane-fast", "w"), onEntry("base-a", "w")]));
+    const md = buildModelTooltipMd(laneValued("lane-fast"), {
+      fetchedAt: null,
+      isBest: false,
+      pricingUrl: "https://example.com/pricing",
+      tariff: 10,
+      thinking: map.get("lane-fast") ?? null,
+    });
+    assert.ok(md.includes("**Thinking** \u00b7 not available \u00b7 same weights: on by default (high) \u00b7 /v1/models"), md);
+  });
+});
