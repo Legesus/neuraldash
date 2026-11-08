@@ -136,7 +136,7 @@ export function partitionByEnergy(valued: ValuedQuote[]): EnergyPartition {
   const ranked: ValuedQuote[] = [];
   const noEnergy: ValuedQuote[] = [];
   for (const v of valued) {
-    if (energySortKey(v) == null) noEnergy.push(v);
+    if (v.descriptionMwh == null) noEnergy.push(v);
     else ranked.push(v);
   }
   return { ranked, noEnergy };

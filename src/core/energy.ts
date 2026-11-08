@@ -1,6 +1,7 @@
 /**
  * Energy normalization and cost helpers. No vscode imports.
  */
+import { formatEnergy } from "./cardFormat";
 
 export function normalizeMwh(raw: string | null | undefined): number | null {
   if (raw == null) return null;
@@ -57,9 +58,7 @@ export function humanizeAge(fetchedAt: string, now: Date = new Date()): string {
 
 export function formatMwh(mwh: number | null): string {
   if (mwh == null) return "-";
-  if (mwh >= 1000) return `${(mwh / 1000).toFixed(2)} Wh`;
-  if (mwh > 0 && mwh < 1) return `${(mwh * 1000).toFixed(2)} μWh`;
-  return `${mwh.toFixed(2)} mWh`;
+  return formatEnergy(mwh);
 }
 
 export function formatCostPer1k(mwh: number | null, tariffPerKWh: number): string {

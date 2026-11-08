@@ -71,6 +71,10 @@ describe("energy.formatMwh", () => {
   it("formats null as dash", () => {
     assert.equal(formatMwh(null), "-");
   });
+  it("decides unit boundaries on the rounded displayed value", () => {
+    assert.equal(formatMwh(0.999996), "1.00 mWh");
+    assert.equal(formatMwh(999.9999), "1.00 Wh");
+  });
 });
 describe("energy.humanizeAge", () => {
   it("just now <60s", () => {

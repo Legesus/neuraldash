@@ -30,6 +30,10 @@ describe("cardFormat — pickUnit", () => {
     assert.equal(pickUnit(1000), "Wh");
     assert.equal(pickUnit(1, 1000), "Wh");
   });
+  it("decides boundaries on the rounded displayed value", () => {
+    assert.equal(pickUnit(0.999996), "mWh");
+    assert.equal(pickUnit(999.9999), "Wh");
+  });
 });
 
 describe("cardFormat — formatEnergy", () => {

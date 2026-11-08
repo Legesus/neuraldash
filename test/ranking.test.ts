@@ -187,13 +187,13 @@ describe("ranking.partitionByEnergy", () => {
     assert.deepEqual(noEnergy.map((v) => v.quote.slug), ["e", "f"]);
   });
 
-  it("uses the sort energy: a row with no displayed value but a ranking basis stays ranked", () => {
+  it("a row with no displayed value but a ranking basis goes to the no-energy group", () => {
     const q = mkQuote({ displayName: "B", slug: "b", bands: mkBands([null, 7, null, null, null, null, null]) });
     const valued = rankQuotes([q], { version: 1, scores: {} }, 10, "typical");
     assert.equal(valued[0].descriptionMwh, null);
     assert.equal(valued[0].basisMwh, 7);
     const { ranked, noEnergy } = partitionByEnergy(valued);
-    assert.deepEqual(ranked.map((v) => v.quote.slug), ["b"]);
-    assert.deepEqual(noEnergy, []);
+    assert.deepEqual(ranked, []);
+    assert.deepEqual(noEnergy.map((v) => v.quote.slug), ["b"]);
   });
 });

@@ -8,7 +8,7 @@ const BAR_GLYPH = "█";
 export function pickUnit(...values: Array<number | null | undefined>): EnergyUnit {
   const finite = values.filter((v): v is number => v != null && Number.isFinite(v));
   if (finite.length === 0) return "mWh";
-  const max = Math.max(...finite);
+  const max = Math.max(...finite.map((v) => Math.round(v * 100) / 100));
   if (max >= 1000) return "Wh";
   if (max > 0 && max < 1) return "μWh";
   return "mWh";

@@ -80,9 +80,10 @@ export function buildSparklineImgTag(
 export function sparklineTooltipRow(spark: Sparkline48h | null | undefined, slug?: string | null): string | null {
   if (!spark) return null;
   const dirWord = spark.direction === "above" ? "above avg" : spark.direction === "below" ? "below avg" : "in line with avg";
+  const unit = pickUnit(spark.minMwh, spark.maxMwh);
   const rangePart =
     spark.minMwh != null && spark.maxMwh != null
-      ? ` · lo ${formatMwh(spark.minMwh)} – hi ${formatMwh(spark.maxMwh)}`
+      ? ` · lo ${formatEnergy(spark.minMwh, unit)} – hi ${formatEnergy(spark.maxMwh, unit)}`
       : "";
   const text = `<span style="color:${TREND_COLORS[spark.direction]};">${trendArrow(spark.direction)} ${dirWord}</span>${rangePart}`;
   if (slug == null || slug === "") return `| 48h trend | ${text} |`;

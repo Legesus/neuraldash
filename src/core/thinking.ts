@@ -105,25 +105,24 @@ export function buildThinkingMap(doc: NeuralwattModelsDoc | null): ReadonlyMap<s
   const out = new Map<string, ThinkingInfo>();
   const data = (doc as { data?: unknown } | null)?.data;
   if (!Array.isArray(data)) return out;
-  const idsByHuggingId = new Map<string, string[]>();
+  const groups = new Map<string, { id: string; info: ThinkingInfo; source: boolean }[]>();
   for (const entry of data) {
     const parsed = baseInfo(entry);
     if (!parsed) continue;
     out.set(parsed.id, parsed.info);
     const hf = entryHuggingId(entry);
-    if (hf != null) {
-      const ids = idsByHuggingId.get(hf);
-      if (ids) ids.push(parsed.id);
-      else idsByHuggingId.set(hf, [parsed.id]);
-    }
+    if (hf == null) continue;
+    const member = { ...parsed, source: entryReasoning(entry) != null };
+    const members = groups.get(hf);
+    if (members) members.push(member);
+    else groups.set(hf, [member]);
   }
-  for (const ids of idsByHuggingId.values()) {
-    const note = sameWeightsNote(ids.map((id) => out.get(id)!));
+  for (const members of groups.values()) {
+    const note = sameWeightsNote(members.filter((m) => m.source).map((m) => m.info));
     if (!note) continue;
-    for (const id of ids) {
-      const info = out.get(id)!;
-      if (!info.supported && info.sameWeights == null) {
-        out.set(id, { ...info, sameWeights: note });
+    for (const m of members) {
+      if (!m.info.supported) {
+        out.set(m.id, { ...m.info, sameWeights: note });
       }
     }
   }

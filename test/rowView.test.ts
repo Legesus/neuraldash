@@ -83,6 +83,13 @@ describe("rowView — sparkline present", () => {
     assert.ok(sparklineTooltipRow(s, "kimi-k3")!.includes("]("), "chart link keeps the sticky-hover marker");
   });
 
+  it("sparklineTooltipRow formats both range ends in one unit", () => {
+    const s = spark({ direction: "below", minMwh: 0.8, maxMwh: 1.2 });
+    const row = sparklineTooltipRow(s, "kimi-k3")!;
+    assert.ok(row.includes("lo 0.80 mWh \u2013 hi 1.20 mWh"), row);
+    assert.ok(!row.includes("\u03bcWh"), row);
+  });
+
   it("sparklineTooltipRow omits the range when labels are missing (text + link still shown)", () => {
     const s = spark({ direction: "neutral", minMwh: null, maxMwh: null });
     const row = sparklineTooltipRow(s, "kimi-k3")!;

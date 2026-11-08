@@ -27,9 +27,9 @@ export class NoEnergySectionItem extends vscode.TreeItem {
   constructor(public readonly rows: ValuedQuote[]) {
     super("No energy data", vscode.TreeItemCollapsibleState.Collapsed);
     this.contextValue = "no-energy.header";
-    this.description = `${rows.length} models`;
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path fill="#808080" d="M9.5 1 3.5 9.2h3.4L6 15l6.5-8.2H9.1L9.5 1z"/></svg>`;
-    this.iconPath = vscode.Uri.parse("data:image/svg+xml;utf8," + encodeURIComponent(svg));
+    this.id = "no-energy.header";
+    this.description = rows.length === 1 ? "1 model" : `${rows.length} models`;
+    this.iconPath = new vscode.ThemeIcon("circle-slash");
   }
 }
 

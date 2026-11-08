@@ -514,6 +514,44 @@ describe("thinking - same-weights note on lanes with thinking off", () => {
     assert.ok(!line.includes("<b>"), line);
   });
 
+  it("capabilities-only sibling is ignored as a source and does not block the note", () => {
+    const map = buildThinkingMap(doc([
+      offEntry("lane-fast", "w"),
+      { id: "cap-only", metadata: { huggingface_id: "w", capabilities: { reasoning: true } } },
+      onEntry("base-a", "w"),
+    ]));
+    assert.deepEqual(map.get("lane-fast")?.sameWeights, {
+      mandatory: false,
+      defaultEnabled: true,
+      defaultEffort: "high",
+      efforts: ["max", "high", "low"],
+    });
+    assert.equal(map.get("cap-only")?.sameWeights, undefined);
+  });
+
+  it("capabilities-only siblings alone never produce an off-by-default note", () => {
+    const map = buildThinkingMap(doc([
+      offEntry("lane-fast", "w"),
+      { id: "cap-only", metadata: { huggingface_id: "w", capabilities: { reasoning: true } } },
+    ]));
+    assert.equal(map.get("lane-fast")?.sameWeights, undefined);
+  });
+
+  it("a duplicated catalog id under two huggingface_id values reads only its own entry", () => {
+    const map = buildThinkingMap(doc([
+      onEntry("dup", "group-a"),
+      offEntry("dup", "group-b"),
+      offEntry("lane-d", "group-a"),
+    ]));
+    assert.deepEqual(map.get("lane-d")?.sameWeights, {
+      mandatory: false,
+      defaultEnabled: true,
+      defaultEffort: "high",
+      efforts: ["max", "high", "low"],
+    });
+    assert.equal(map.get("dup")?.sameWeights, undefined);
+  });
+
   it("model hover renders the note through the shared formatter", () => {
     const map = buildThinkingMap(doc([offEntry("lane-fast", "w"), onEntry("base-a", "w")]));
     const md = buildModelTooltipMd(laneValued("lane-fast"), {
