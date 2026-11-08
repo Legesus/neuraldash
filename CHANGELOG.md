@@ -2,6 +2,16 @@
 
 All notable changes to NeuralDash are documented here.
 
+## 0.6.0 — 2026-11-08
+
+Thinking effort on hover cards, and a board fix for sub-milliwatt models:
+
+- **Thinking line** — model and Flex hover cards state whether thinking is available, whether it is always on, on by default or off by default, the default effort, and the supported effort levels exactly as published. Read from `https://api.neuralwatt.com/v1/models` (`metadata.capabilities.reasoning`, `metadata.reasoning`), the document NeuralDash already fetches for Flex pricing, so there is no new request or setting. Flex rows use their own catalog entry, then their base model's. Models the catalog does not list show no line. `NeuralDash: Debug Tooltip` shows the same line.
+- **Same-weights note** — a lane with thinking off (e.g. a fast lane) also shows the thinking of catalog entries that share its `metadata.huggingface_id`, when they agree: `Thinking · not available · same weights: on by default (high)`.
+- **μWh energy** — `https://portal.neuralwatt.com/energy-pricing?view=energy` publishes very low-energy rows (an embedding model) in μWh, which NeuralDash did not parse, so those rows showed no energy. They now parse and rank, and values below 1 mWh display as μWh everywhere, with one unit per range.
+- **No energy data section** — rows the board publishes no energy for move out of the ranked list into a collapsed section at the bottom.
+- The Flex hover card is now built by a pure core function, tested the same way as the model card.
+
 ## 0.5.1 — 2026-11-07
 
 Fixes for the redesigned Neuralwatt portal:

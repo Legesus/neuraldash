@@ -6,9 +6,10 @@ Live NeuralWatt **energy-per-request** board inside VS Code. Shows `Right now` a
 
 ## Features
 
-- Tree view `NeuralWatt` → `Energy Board` lists all models with energy and cost per 1k requests.
+- Tree view `NeuralWatt` → `Energy Board` lists all models with energy and cost per 1k requests. Energy is shown in μWh, mWh or Wh to fit the value. Models the board publishes no energy for sit in a collapsed `No energy data` section.
 - **48h trend chart** — right-click a model row (or use the tooltip link) to open a chart panel rendering the full 48-hour trendline with reference line and trend coloring.
 - Rich, sticky tooltips: full per-band table, colored 48h trend summary, cache hit %, benchmark value, plus `Copy Slug` and `Open Pricing Page` actions.
+- **Thinking line** on model and Flex tooltips, read from Neuralwatt's `/v1/models` catalog: whether the model thinks, whether it's always on, on by default or off by default, the default effort, and the effort levels it accepts (verbatim, ready for `reasoning_effort`). A lane with thinking off also shows what other lanes on the same weights do. Models the catalog doesn't list show no line.
 - Value ranking: `value = performanceScore / basisMwh` (basis from `preferredBand`).
 - Status bar — pins your chosen model (`neuraldash.myModel`) as `⚡ <name> · 245.48 mWh · $2.45/1k`.
 - Flex tiers — Neuralwatt's flex-tier models retrieved live from the catalog, each row labeled with its pricing provenance.
