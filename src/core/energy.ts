@@ -13,12 +13,13 @@ export function normalizeMwh(raw: string | null | undefined): number | null {
   s = s.replace(/~/g, "").replace(/\u00b7/g, "").replace(/\u2013/g, "-").replace(/\u2014/g, "-").trim();
   // standalone dash after cleanup
   if (s === "-" || s === "" ) return null;
-  const m = s.match(/([\d.,]+)\s*(mWh|kWh|Wh)/i);
+  const m = s.match(/([\d.,]+)\s*([μµu]Wh|mWh|kWh|Wh)/i);
   if (!m) return null;
   const numStr = m[1].replace(/,/g, "");
   const val = parseFloat(numStr);
   if (Number.isNaN(val)) return null;
   const unit = m[2].toLowerCase();
+  if (unit === "μwh" || unit === "µwh" || unit === "uwh") return val / 1e3;
   if (unit === "mwh") return val;
   if (unit === "wh") return val * 1e3;
   if (unit === "kwh") return val * 1e6;
@@ -57,6 +58,7 @@ export function humanizeAge(fetchedAt: string, now: Date = new Date()): string {
 export function formatMwh(mwh: number | null): string {
   if (mwh == null) return "-";
   if (mwh >= 1000) return `${(mwh / 1000).toFixed(2)} Wh`;
+  if (mwh > 0 && mwh < 1) return `${(mwh * 1000).toFixed(2)} μWh`;
   return `${mwh.toFixed(2)} mWh`;
 }
 

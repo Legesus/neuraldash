@@ -246,3 +246,14 @@ describe("cardFormat — flexEnergyTable", () => {
     assert.deepEqual(flexEnergyTable(20, 0.2, 0), []);
   });
 });
+
+describe("cardFormat sub-milliwatt-hour energy", () => {
+  it("picks μWh when every value is below 1 mWh", () => {
+    assert.equal(pickUnit(0.89823, 0.67488), "\u03bcWh");
+    assert.equal(pickUnit(0.5, 2), "mWh");
+  });
+  it("formats sub-mWh energy in μWh", () => {
+    assert.equal(formatEnergy(0.89823), "898.23 \u03bcWh");
+    assert.equal(formatEnergyRange(0.5, 0.75), "500.00–750.00 \u03bcWh");
+  });
+});

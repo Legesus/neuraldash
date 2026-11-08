@@ -1,6 +1,6 @@
 import type { BandEnergy, SparklinePoint, TrendInfo } from "./types";
 
-export type EnergyUnit = "mWh" | "Wh";
+export type EnergyUnit = "μWh" | "mWh" | "Wh";
 
 const SPARK_GLYPHS = ["▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"];
 const BAR_GLYPH = "█";
@@ -8,18 +8,23 @@ const BAR_GLYPH = "█";
 export function pickUnit(...values: Array<number | null | undefined>): EnergyUnit {
   const finite = values.filter((v): v is number => v != null && Number.isFinite(v));
   if (finite.length === 0) return "mWh";
-  return Math.max(...finite) >= 1000 ? "Wh" : "mWh";
+  const max = Math.max(...finite);
+  if (max >= 1000) return "Wh";
+  if (max > 0 && max < 1) return "μWh";
+  return "mWh";
 }
 
 export function formatEnergy(mwh: number | null | undefined, unit: EnergyUnit = pickUnit(mwh)): string {
   if (mwh == null || !Number.isFinite(mwh)) return "—";
-  return unit === "Wh" ? `${(mwh / 1000).toFixed(2)} Wh` : `${mwh.toFixed(2)} mWh`;
+  if (unit === "Wh") return `${(mwh / 1000).toFixed(2)} Wh`;
+  if (unit === "μWh") return `${(mwh * 1000).toFixed(2)} μWh`;
+  return `${mwh.toFixed(2)} mWh`;
 }
 
 export function formatEnergyRange(lo: number | null | undefined, hi: number | null | undefined): string | null {
   if (lo == null || hi == null || !Number.isFinite(lo) || !Number.isFinite(hi)) return null;
   const unit = pickUnit(lo, hi);
-  const loText = formatEnergy(lo, unit).replace(/ (m?Wh)$/, "");
+  const loText = formatEnergy(lo, unit).replace(/ ([μm]?Wh)$/, "");
   return `${loText}–${formatEnergy(hi, unit)}`;
 }
 

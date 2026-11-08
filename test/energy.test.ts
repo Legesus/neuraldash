@@ -11,6 +11,12 @@ describe("energy.normalizeMwh", () => {
     assert.equal(normalizeMwh("1.73 Wh"), 1730);
     assert.equal(normalizeMwh("0.5 Wh"), 500);
   });
+  it("converts μWh ÷1e3 for the Greek mu, the micro sign and a plain u", () => {
+    const near = (actual: number | null, expected: number) => assert.ok(actual != null && Math.abs(actual - expected) < 1e-9, `${actual} ≈ ${expected}`);
+    near(normalizeMwh("898.23 μWh"), 0.89823);
+    near(normalizeMwh("~674.88 µWh"), 0.67488);
+    near(normalizeMwh("500 uWh"), 0.5);
+  });
   it("converts kWh ×1e6", () => {
     assert.equal(normalizeMwh("0.002 kWh"), 2000);
     assert.equal(normalizeMwh("1 kWh"), 1e6);
@@ -54,6 +60,9 @@ describe("energy.formatMwh", () => {
   it("formats sub-1000 values as mWh with 2 decimals", () => {
     assert.equal(formatMwh(999.99), "999.99 mWh");
     assert.equal(formatMwh(0), "0.00 mWh");
+  });
+  it("formats values between 0 and 1 mWh as μWh", () => {
+    assert.equal(formatMwh(0.89823), "898.23 μWh");
   });
   it("formats values >= 1000 as Wh with 2 decimals", () => {
     assert.equal(formatMwh(1000), "1.00 Wh");
