@@ -30,7 +30,7 @@ export function buildFlexTooltipMd(
   if (std) tierNotes.push(`Normal from ${std.source === "v1-standard" ? "/v1/models" : "portal /models card"}`);
   lines.push(`\n${tierNotes.join(" · ")}`);
   const updated = entry.lastUpdated ? ` · updated ${escapeMarkdownLocal(entry.lastUpdated)}` : "";
-  if (opts.thinking) lines.push("", escapeMarkdownLocal(formatThinkingLine(opts.thinking)));
+  if (opts.thinking) lines.push("", formatThinkingLine(opts.thinking));
 
   const energyTable = base ? flexEnergyTable(base.descriptionMwh, base.costPer1kUsd, entry.flexMultiplier) : [];
   if (energyTable.length > 0) {

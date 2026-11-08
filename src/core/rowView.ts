@@ -141,7 +141,7 @@ export function buildModelTooltipMd(
     lines.push(`**Benchmark** · ${parts.join(" · ")}`);
   }
 
-  if (opts.thinking) lines.push("", escapeMarkdownLocal(formatThinkingLine(opts.thinking)));
+  if (opts.thinking) lines.push("", formatThinkingLine(opts.thinking));
 
   const { shown, hiddenCount } = rankBands(q.bands);
   if (shown.length > 0) {

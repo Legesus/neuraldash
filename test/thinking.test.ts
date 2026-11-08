@@ -262,7 +262,7 @@ describe("thinking - model hover seam (buildModelTooltipMd)", () => {
     assert.ok(think > bench, "thinking line after benchmark");
     assert.ok(prompt > think, "thinking line before prompt-size table");
     assert.ok(
-      md.includes("**Thinking** · on by default \\(high\\) · levels: max, xhigh, high, low, none · /v1/models"),
+      md.includes("**Thinking** · on by default (high) · levels: max, xhigh, high, low, none · /v1/models"),
       md,
     );
   });
@@ -277,9 +277,66 @@ describe("thinking - model hover seam (buildModelTooltipMd)", () => {
   });
 
   it("escapes hostile catalog strings in the rendered line", () => {
-    const md = render(info({ defaultEffort: "<b>&x", efforts: ["<img src=src>", "(paren)"] }));
-    assert.ok(md.includes("**Thinking** · on by default \\(&lt;b&gt;&amp;x\\)"), md);
-    assert.ok(md.includes("levels: &lt;img src=src&gt;, \\(paren\\)"), md);
+    const md = render(info({ defaultEffort: "<b>&x", efforts: ["<img src=src>", "(paren)", "*em*", "a_b"] }));
+    assert.ok(md.includes("**Thinking** · on by default (&lt;b&gt;&amp;x)"), md);
+    assert.ok(md.includes("levels: &lt;img src=src&gt;, \\(paren\\), \\*em\\*, a\\_b"), md);
+    assert.ok(md.includes("**Thinking** · on by default"), "chrome stays bold, not escaped");
     assert.ok(!md.includes("<img"), "no raw html survives");
+  });
+});
+
+
+describe("thinking - review fixes", () => {
+  function doc(data: unknown[]): NeuralwattModelsDoc {
+    return { data } as unknown as NeuralwattModelsDoc;
+  }
+
+  function info(over?: Partial<ThinkingInfo>): ThinkingInfo {
+    return {
+      supported: true,
+      mandatory: false,
+      defaultEnabled: true,
+      defaultEffort: "high",
+      efforts: ["max", "xhigh", "high", "low", "none"],
+      ...over,
+    };
+  }
+
+  it("boolean capabilities.reasoning true alone yields a ThinkingInfo without published fields", () => {
+    const map = buildThinkingMap(doc([{ id: "model-j", metadata: { capabilities: { reasoning: true } } }]));
+    assert.deepEqual(map.get("model-j"), {
+      supported: true,
+      mandatory: false,
+      defaultEnabled: false,
+      defaultEffort: null,
+      efforts: [],
+    } satisfies ThinkingInfo);
+  });
+
+  it("boolean capabilities.reasoning false alone yields not-available info and wording", () => {
+    const map = buildThinkingMap(doc([{ id: "model-k", metadata: { capabilities: { reasoning: false } } }]));
+    assert.deepEqual(map.get("model-k"), {
+      supported: false,
+      mandatory: false,
+      defaultEnabled: false,
+      defaultEffort: null,
+      efforts: [],
+    } satisfies ThinkingInfo);
+    assert.equal(formatThinkingLine(map.get("model-k")!), "**Thinking** · not available · /v1/models");
+  });
+
+  it("entries with neither a reasoning block nor a boolean capabilities flag stay absent", () => {
+    const map = buildThinkingMap(doc([
+      { id: "model-l", metadata: { capabilities: { reasoning: "auto" } } },
+      { id: "model-m", metadata: { capabilities: "junk" } },
+    ]));
+    assert.equal(map.size, 0);
+  });
+
+  it("catalog values neutralise markdown emphasis while the chrome stays bold", () => {
+    assert.equal(
+      formatThinkingLine(info({ defaultEffort: "*x*", efforts: ["_y_", "**z**"] })),
+      "**Thinking** · on by default (\\*x\\*) · levels: \\_y\\_, \\*\\*z\\*\\* · /v1/models",
+    );
   });
 });

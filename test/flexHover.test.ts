@@ -163,7 +163,7 @@ describe("flexHover - thinking line on Flex hovers", () => {
     assert.ok(think > notes, "thinking line after the notes line");
     assert.ok(energy > think, "thinking line before the energy table");
     assert.ok(
-      md.includes("**Thinking** · on by default \\(high\\) · levels: max, xhigh, high, low, none · /v1/models"),
+      md.includes("**Thinking** · on by default (high) · levels: max, xhigh, high, low, none · /v1/models"),
       md,
     );
   });
@@ -188,7 +188,7 @@ describe("flexHover - thinking line on Flex hovers", () => {
     assert.ok(hit);
     assert.equal(hit.mandatory, false);
     const md = buildFlexTooltipMd(entry(), sources(), boardRow(), { pricingUrl: PRICING_URL, thinking: hit });
-    assert.ok(md.includes("**Thinking** · on by default \\(low\\) · levels: low, none · /v1/models"), md);
+    assert.ok(md.includes("**Thinking** · on by default (low) · levels: low, none · /v1/models"), md);
   });
 
   it("no Thinking line when neither the Flex id nor the base slug is listed", () => {
@@ -215,10 +215,11 @@ describe("flexHover - thinking line on Flex hovers", () => {
       entry(),
       sources(),
       boardRow(),
-      { pricingUrl: PRICING_URL, thinking: info({ defaultEffort: "<b>&x", efforts: ["<img src=src>", "(paren)"] }) },
+      { pricingUrl: PRICING_URL, thinking: info({ defaultEffort: "<b>&x", efforts: ["<img src=src>", "(paren)", "*em*", "a_b"] }) },
     );
-    assert.ok(md.includes("**Thinking** · on by default \\(&lt;b&gt;&amp;x\\)"), md);
-    assert.ok(md.includes("levels: &lt;img src=src&gt;, \\(paren\\)"), md);
+    assert.ok(md.includes("**Thinking** · on by default (&lt;b&gt;&amp;x)"), md);
+    assert.ok(md.includes("levels: &lt;img src=src&gt;, \\(paren\\), \\*em\\*, a\\_b"), md);
+    assert.ok(md.includes("**Thinking** · on by default"), "chrome stays bold, not escaped");
     assert.ok(!md.includes("<img"), "no raw html survives");
   });
 });

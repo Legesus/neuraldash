@@ -1,4 +1,6 @@
 import type { NeuralwattModelsDoc } from "./flexCatalog";
+import { isRecord } from "./flexCatalog";
+import { escapeMarkdownLocal } from "./rowView";
 
 export interface ThinkingInfo {
   readonly supported: boolean;
@@ -6,10 +8,6 @@ export interface ThinkingInfo {
   readonly defaultEnabled: boolean;
   readonly defaultEffort: string | null;
   readonly efforts: readonly string[];
-}
-
-function isRecord(x: unknown): x is Record<string, unknown> {
-  return x !== null && typeof x === "object" && !Array.isArray(x);
 }
 
 function entryMetadata(entry: unknown): Record<string, unknown> | null {
@@ -54,14 +52,14 @@ export function buildThinkingMap(doc: NeuralwattModelsDoc | null): ReadonlyMap<s
     const id = entry["id"];
     if (typeof id !== "string" || id === "") continue;
     const reasoning = entryReasoning(entry);
-    if (!reasoning) continue;
-    const efforts = publishedEfforts(reasoning);
     const cap = capabilitiesReasoning(entry);
+    if (!reasoning && cap == null) continue;
+    const efforts = reasoning ? publishedEfforts(reasoning) : [];
     out.set(id, {
       supported: cap != null ? cap : efforts.length > 0,
-      mandatory: reasoning["mandatory"] === true,
-      defaultEnabled: reasoning["default_enabled"] === true,
-      defaultEffort: publishedDefaultEffort(reasoning),
+      mandatory: reasoning != null && reasoning["mandatory"] === true,
+      defaultEnabled: reasoning != null && reasoning["default_enabled"] === true,
+      defaultEffort: reasoning ? publishedDefaultEffort(reasoning) : null,
       efforts,
     });
   }
@@ -80,13 +78,17 @@ export function thinkingFor(
   return null;
 }
 
+function catalogValue(value: string): string {
+  return escapeMarkdownLocal(value).replace(/\*/g, "\\*").replace(/_/g, "\\_");
+}
+
 export function formatThinkingLine(info: ThinkingInfo): string {
   if (!info.supported) return "**Thinking** · not available · /v1/models";
   const state = info.mandatory ? "always on" : info.defaultEnabled ? "on by default" : "off by default";
   const effort = state === "off by default" ? null : info.defaultEffort;
-  const statePart = effort != null ? `${state} (${effort})` : state;
+  const statePart = effort != null ? `${state} (${catalogValue(effort)})` : state;
   const parts = [`**Thinking** · ${statePart}`];
-  if (info.efforts.length > 0) parts.push(`levels: ${info.efforts.join(", ")}`);
+  if (info.efforts.length > 0) parts.push(`levels: ${info.efforts.map((e) => catalogValue(e)).join(", ")}`);
   parts.push("/v1/models");
   return parts.join(" · ");
 }
