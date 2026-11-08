@@ -127,6 +127,20 @@ export function sortValued(list: ValuedQuote[], order: SortOrder): ValuedQuote[]
   return arr;
 }
 
+export interface EnergyPartition {
+  readonly ranked: ValuedQuote[];
+  readonly noEnergy: ValuedQuote[];
+}
+
+export function partitionByEnergy(valued: ValuedQuote[]): EnergyPartition {
+  const ranked: ValuedQuote[] = [];
+  const noEnergy: ValuedQuote[] = [];
+  for (const v of valued) {
+    if (energySortKey(v) == null) noEnergy.push(v);
+    else ranked.push(v);
+  }
+  return { ranked, noEnergy };
+}
 export function bestValueSlug(valued: ValuedQuote[]): string | null {
   let best: ValuedQuote | null = null;
   for (const v of valued) {

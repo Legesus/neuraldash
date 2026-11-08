@@ -7,7 +7,7 @@ import type { FlexEntry, FlexSources } from "../core/flexCatalog";
 import { formatFlexEntryDescription } from "../core/flexCatalog";
 import { modelRowDescription, buildModelTooltipMd } from "../core/rowView";
 import { buildFlexTooltipMd } from "../core/flexHover";
-import { sortValued, energySortKey } from "../core/ranking";
+import { sortValued, energySortKey, partitionByEnergy } from "../core/ranking";
 import { NEURALWATT_URL } from "../providers/neuralwattProvider";
 import type { ThinkingInfo } from "../core/thinking";
 import { thinkingFor } from "../core/thinking";
@@ -18,6 +18,16 @@ export class FlexSectionItem extends vscode.TreeItem {
     this.contextValue = "flex.header";
     this.description = `${flexEntries.length} variants`;
     // grey zap icon for the header (same grey as null-basis)
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path fill="#808080" d="M9.5 1 3.5 9.2h3.4L6 15l6.5-8.2H9.1L9.5 1z"/></svg>`;
+    this.iconPath = vscode.Uri.parse("data:image/svg+xml;utf8," + encodeURIComponent(svg));
+  }
+}
+
+export class NoEnergySectionItem extends vscode.TreeItem {
+  constructor(public readonly rows: ValuedQuote[]) {
+    super("No energy data", vscode.TreeItemCollapsibleState.Collapsed);
+    this.contextValue = "no-energy.header";
+    this.description = `${rows.length} models`;
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path fill="#808080" d="M9.5 1 3.5 9.2h3.4L6 15l6.5-8.2H9.1L9.5 1z"/></svg>`;
     this.iconPath = vscode.Uri.parse("data:image/svg+xml;utf8," + encodeURIComponent(svg));
   }
@@ -120,17 +130,25 @@ export class BoardTreeProvider implements vscode.TreeDataProvider<vscode.TreeIte
       return element.flexEntries.map((e) => this.toFlexItem(e));
     }
 
+    if (element instanceof NoEnergySectionItem) {
+      return element.rows.map((v) => this.toTreeItem(v));
+    }
+
     if (!this.snapshot || this.valued.length === 0) {
       const item = new vscode.TreeItem(this.statusMessage ?? "No data yet — refresh to load.", vscode.TreeItemCollapsibleState.None);
       item.description = this.snapshot ? `${this.snapshot.quotes.length} models` : undefined;
       return [item];
     }
     const sorted = this.applySort(this.valued);
-    const rows: vscode.TreeItem[] = sorted.map((v) => this.toTreeItem(v));
+    const { ranked, noEnergy } = partitionByEnergy(sorted);
+    const rows: vscode.TreeItem[] = ranked.map((v) => this.toTreeItem(v));
 
     // Append flex collapsible section when enabled and the catalog has rows
     if (this.flexEnabled && this.flexEntries.length > 0) {
       rows.push(new FlexSectionItem(this.flexEntries));
+    }
+    if (noEnergy.length > 0) {
+      rows.push(new NoEnergySectionItem(noEnergy));
     }
     return rows;
   }

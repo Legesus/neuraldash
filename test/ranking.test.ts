@@ -1,8 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import type { ModelQuote, ScoreTable } from "../src/core/types";
+import type { ModelQuote, ScoreTable, ValuedQuote } from "../src/core/types";
 import { BAND_KEYS } from "../src/core/types";
-import { resolveBasisMwh, rankQuotes, sortValued, bestValueSlug } from "../src/core/ranking";
+import { resolveBasisMwh, rankQuotes, sortValued, bestValueSlug, partitionByEnergy } from "../src/core/ranking";
 
 function mkQuote(over: Partial<ModelQuote> & { displayName: string; slug: string }): ModelQuote {
   return {
@@ -143,5 +143,57 @@ describe("ranking comparators", () => {
     assert.equal(bestValueSlug(valued), "b");
     const valued2 = rankQuotes([a], { version: 1, scores: {} }, 10, "typical");
     assert.equal(bestValueSlug(valued2), null);
+  });
+});
+
+describe("ranking.partitionByEnergy", () => {
+  function valuedFor(quotes: ModelQuote[]): ValuedQuote[] {
+    return rankQuotes(quotes, { version: 1, scores: {} }, 10, "typical");
+  }
+
+  it("rows with energy stay in the ranked group in order", () => {
+    const valued = valuedFor([
+      mkQuote({ displayName: "A", slug: "a", rightNowMwh: 3, typicalMwh: 4 }),
+      mkQuote({ displayName: "B", slug: "b", rightNowMwh: 9, typicalMwh: 8 }),
+    ]);
+    const { ranked, noEnergy } = partitionByEnergy(valued);
+    assert.deepEqual(ranked.map((v) => v.quote.slug), ["a", "b"]);
+    assert.deepEqual(noEnergy.map((v) => v.quote.slug), []);
+  });
+
+  it("rows without an energy value move to the no-energy group", () => {
+    const valued = valuedFor([
+      mkQuote({ displayName: "A", slug: "a", rightNowMwh: 3 }),
+      mkQuote({ displayName: "E", slug: "e", bands: mkBands([null, null, null, null, null, null, null]) }),
+    ]);
+    const { ranked, noEnergy } = partitionByEnergy(valued);
+    assert.deepEqual(ranked.map((v) => v.quote.slug), ["a"]);
+    assert.deepEqual(noEnergy.map((v) => v.quote.slug), ["e"]);
+  });
+
+  it("empty board partitions to two empty groups", () => {
+    const { ranked, noEnergy } = partitionByEnergy([]);
+    assert.deepEqual(ranked, []);
+    assert.deepEqual(noEnergy, []);
+  });
+
+  it("all rows without energy: ranked group empty, group keeps every row in order", () => {
+    const valued = valuedFor([
+      mkQuote({ displayName: "E", slug: "e", bands: mkBands([null, null, null, null, null, null, null]) }),
+      mkQuote({ displayName: "F", slug: "f", bands: mkBands([null, null, null, null, null, null, null]) }),
+    ]);
+    const { ranked, noEnergy } = partitionByEnergy(valued);
+    assert.deepEqual(ranked, []);
+    assert.deepEqual(noEnergy.map((v) => v.quote.slug), ["e", "f"]);
+  });
+
+  it("uses the sort energy: a row with no displayed value but a ranking basis stays ranked", () => {
+    const q = mkQuote({ displayName: "B", slug: "b", bands: mkBands([null, 7, null, null, null, null, null]) });
+    const valued = rankQuotes([q], { version: 1, scores: {} }, 10, "typical");
+    assert.equal(valued[0].descriptionMwh, null);
+    assert.equal(valued[0].basisMwh, 7);
+    const { ranked, noEnergy } = partitionByEnergy(valued);
+    assert.deepEqual(ranked.map((v) => v.quote.slug), ["b"]);
+    assert.deepEqual(noEnergy, []);
   });
 });
