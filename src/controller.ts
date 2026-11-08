@@ -16,6 +16,7 @@ import type { FlexPerfDoc } from "./core/flexPerf";
 import { parseFlexCatalogCards } from "./core/flexCatalogCards";
 import type { FlexCardsDoc } from "./core/flexCatalogCards";
 import { buildDisplayNameMap, applyDisplayNames } from "./core/displayNames";
+import { buildThinkingMap } from "./core/thinking";
 import { FlexCatalogCacheManager } from "./core/flexCatalogCache";
 import { eciScoreTable, isEciDoc } from "./core/eciScores";
 import type { EciDoc } from "./core/eciScores";
@@ -180,6 +181,7 @@ export class Controller {
       valued,
       buildDisplayNameMap(this.flexV1DocCache, this.registryCache, this.flexCardsDocCache),
     );
+    const thinking = buildThinkingMap(this.flexV1DocCache);
 
     // Flex catalog per render: document membership + registry enrichment + board slugs
     const showFlex = vscode.workspace.getConfiguration("neuraldash").get<boolean>("showFlexTiers", true);
@@ -187,7 +189,7 @@ export class Controller {
       ? buildFlexCatalog(this.flexV1DocCache, this.flexPerfDocCache, this.flexCardsDocCache, this.registryCache, new Set(snapshot.quotes.map((q) => q.slug)))
       : [];
 
-    this.tree.setData(snapshot, enriched, best, tariff, flexList, this.registrySource, this.flexSources());
+    this.tree.setData(snapshot, enriched, best, tariff, flexList, this.registrySource, this.flexSources(), thinking);
     const myModel = vscode.workspace.getConfiguration("neuraldash").get<string>("myModel", "");
     this.statusBar.update(myModel, enriched);
   }

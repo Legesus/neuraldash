@@ -13,6 +13,8 @@ import { basisToSvgUri } from "./color";
 import { costPer1kUsd, formatMwh, humanizeAge } from "./energy";
 import { TREND_COLORS, trendArrow, sparklineCardSvg, sparklineIconSvg, sparklineDescriptionSuffix } from "./sparkline";
 import { sparklineToPngBytes } from "./sparklinePng";
+import { formatThinkingLine } from "./thinking";
+import type { ThinkingInfo } from "./thinking";
 
 /**
  * Compose the tree-row description. Exact legacy shape when spark is absent:
@@ -101,7 +103,7 @@ export function sparklineTooltipRow(spark: Sparkline48h | null | undefined, slug
  */
 export function buildModelTooltipMd(
   v: ValuedQuote,
-  opts: { fetchedAt: string | null; isBest: boolean; pricingUrl: string; tariff: number; now?: Date },
+  opts: { fetchedAt: string | null; isBest: boolean; pricingUrl: string; tariff: number; now?: Date; thinking?: ThinkingInfo | null },
 ): string {
   const q = v.quote;
   const mwh = v.descriptionMwh;
@@ -138,6 +140,8 @@ export function buildModelTooltipMd(
     lines.push("");
     lines.push(`**Benchmark** · ${parts.join(" · ")}`);
   }
+
+  if (opts.thinking) lines.push("", escapeMarkdownLocal(formatThinkingLine(opts.thinking)));
 
   const { shown, hiddenCount } = rankBands(q.bands);
   if (shown.length > 0) {

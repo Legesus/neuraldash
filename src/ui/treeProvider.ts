@@ -10,6 +10,7 @@ import { flexEnergyTable, tierComparisonTable } from "../core/cardFormat";
 import { sortValued, energySortKey } from "../core/ranking";
 import { NEURALWATT_URL } from "../providers/neuralwattProvider";
 import { formatContextTokens } from "../core/flex";
+import type { ThinkingInfo } from "../core/thinking";
 
 export class FlexSectionItem extends vscode.TreeItem {
   constructor(public readonly flexEntries: FlexEntry[]) {
@@ -38,6 +39,7 @@ export class BoardTreeProvider implements vscode.TreeDataProvider<vscode.TreeIte
   private flexEntries: FlexEntry[] = [];
   private registrySource = "";
   private flexSources: FlexSources | null = null;
+  private thinking: ReadonlyMap<string, ThinkingInfo> = new Map();
 
   constructor(private readonly context: vscode.ExtensionContext) {
     const saved = context.workspaceState.get<SortOrder>("sortOrder");
@@ -60,6 +62,7 @@ export class BoardTreeProvider implements vscode.TreeDataProvider<vscode.TreeIte
     flexEntries: FlexEntry[] = [],
     registrySource = "",
     flexSources: FlexSources | null = null,
+    thinking: ReadonlyMap<string, ThinkingInfo> = new Map(),
   ): void {
     this.snapshot = snapshot;
     this.valued = valued;
@@ -68,6 +71,7 @@ export class BoardTreeProvider implements vscode.TreeDataProvider<vscode.TreeIte
     this.flexEntries = flexEntries;
     this.registrySource = registrySource;
     this.flexSources = flexSources;
+    this.thinking = thinking;
     // compute severity scale once per render, over the same energy the rows
     // display and sort by (right-now first) so color tracks the visible order
     const bases = valued.map(energySortKey);
@@ -102,6 +106,7 @@ export class BoardTreeProvider implements vscode.TreeDataProvider<vscode.TreeIte
       bestSlug: this.bestSlug,
       tariff: this.tariff,
       registrySource: this.registrySource,
+      thinking: this.thinking,
     };
   }
 
@@ -215,6 +220,7 @@ export class BoardTreeProvider implements vscode.TreeDataProvider<vscode.TreeIte
       isBest,
       pricingUrl: NEURALWATT_URL,
       tariff: this.tariff,
+      thinking: this.thinking.get(v.quote.slug) ?? null,
     });
     md.isTrusted = true;
     item.tooltip = md;
@@ -263,4 +269,5 @@ export interface BoardSnapshotData {
   bestSlug: string | null;
   tariff: number;
   registrySource: string;
+  thinking: ReadonlyMap<string, ThinkingInfo>;
 }

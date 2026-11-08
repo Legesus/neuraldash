@@ -123,6 +123,7 @@ export function activate(context: vscode.ExtensionContext): void {
           isBest: board.bestSlug != null && v.quote.slug === board.bestSlug,
           pricingUrl: NEURALWATT_URL,
           tariff: board.tariff,
+          thinking: board.thinking.get(v.quote.slug) ?? null,
         },
       );
       const channel = vscode.window.createOutputChannel("NeuralDash Debug");
