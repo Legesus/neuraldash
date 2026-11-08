@@ -10,6 +10,7 @@ import { buildFlexTooltipMd } from "../core/flexHover";
 import { sortValued, energySortKey } from "../core/ranking";
 import { NEURALWATT_URL } from "../providers/neuralwattProvider";
 import type { ThinkingInfo } from "../core/thinking";
+import { thinkingFor } from "../core/thinking";
 
 export class FlexSectionItem extends vscode.TreeItem {
   constructor(public readonly flexEntries: FlexEntry[]) {
@@ -144,7 +145,7 @@ export class BoardTreeProvider implements vscode.TreeDataProvider<vscode.TreeIte
 
     const md = new vscode.MarkdownString(undefined, true);
     const base = this.valued.find((v) => v.quote.slug === entry.baseSlug) ?? null;
-    md.value = buildFlexTooltipMd(entry, this.flexSources, base, { pricingUrl: NEURALWATT_URL });
+    md.value = buildFlexTooltipMd(entry, this.flexSources, base, { pricingUrl: NEURALWATT_URL, thinking: thinkingFor(this.thinking, [entry.slug, entry.baseSlug]) });
     md.isTrusted = true;
     item.tooltip = md;
     return item;

@@ -3,12 +3,14 @@ import type { ValuedQuote } from "./types";
 import { tierComparisonTable, flexEnergyTable } from "./cardFormat";
 import { escapeMarkdownLocal, tooltipFooter } from "./rowView";
 import { formatContextTokens } from "./flex";
+import { formatThinkingLine } from "./thinking";
+import type { ThinkingInfo } from "./thinking";
 
 export function buildFlexTooltipMd(
   entry: FlexEntry,
   sources: FlexSources | null,
   base: ValuedQuote | null,
-  opts: { pricingUrl: string },
+  opts: { pricingUrl: string; thinking?: ThinkingInfo | null },
 ): string {
   const lines: string[] = [];
   const subtitle = [entry.provider, entry.family].filter((s): s is string => !!s).map(escapeMarkdownLocal).join(" · ");
@@ -28,6 +30,8 @@ export function buildFlexTooltipMd(
   if (std) tierNotes.push(`Normal from ${std.source === "v1-standard" ? "/v1/models" : "portal /models card"}`);
   lines.push(`\n${tierNotes.join(" · ")}`);
   const updated = entry.lastUpdated ? ` · updated ${escapeMarkdownLocal(entry.lastUpdated)}` : "";
+  if (opts.thinking) lines.push("", escapeMarkdownLocal(formatThinkingLine(opts.thinking)));
+
   const energyTable = base ? flexEnergyTable(base.descriptionMwh, base.costPer1kUsd, entry.flexMultiplier) : [];
   if (energyTable.length > 0) {
     lines.push("", ...energyTable);

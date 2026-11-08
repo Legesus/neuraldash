@@ -1,6 +1,9 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import type { FlexEntry, FlexSources } from "../src/core/flexCatalog";
+import type { NeuralwattModelsDoc } from "../src/core/flexCatalog";
+import { buildThinkingMap, thinkingFor } from "../src/core/thinking";
+import type { ThinkingInfo } from "../src/core/thinking";
 import type { ValuedQuote } from "../src/core/types";
 import { buildFlexTooltipMd } from "../src/core/flexHover";
 
@@ -131,5 +134,91 @@ describe("flexHover - Flex hover markdown parity with the pre-prefactor inline c
     assert.ok(md.includes("`p\\(a\\)r\\`en\\`\\[x\\]`"), "slug escapes parens, backticks and brackets");
     assert.ok(md.includes("%28") && md.includes("%29"), "copySlug arg percent-encodes parentheses");
     assert.equal(md.match(/command:neuraldash\.copySlug\?[^)]+\)/g)?.length, 1, "exactly one closed copySlug link");
+  });
+});
+
+
+describe("flexHover - thinking line on Flex hovers", () => {
+  function info(over?: Partial<ThinkingInfo>): ThinkingInfo {
+    return {
+      supported: true,
+      mandatory: false,
+      defaultEnabled: true,
+      defaultEffort: "high",
+      efforts: ["max", "xhigh", "high", "low", "none"],
+      ...over,
+    };
+  }
+
+  function doc(data: unknown[]): NeuralwattModelsDoc {
+    return { data } as unknown as NeuralwattModelsDoc;
+  }
+
+  it("renders the Thinking line after the context/multiplier notes line, before the energy table", () => {
+    const md = buildFlexTooltipMd(entry(), sources(), boardRow(), { pricingUrl: PRICING_URL, thinking: info() });
+    const notes = md.indexOf("context tokens");
+    const think = md.indexOf("**Thinking**");
+    const energy = md.indexOf("| Energy / req |");
+    assert.ok(notes > 0, "tier notes line present");
+    assert.ok(think > notes, "thinking line after the notes line");
+    assert.ok(energy > think, "thinking line before the energy table");
+    assert.ok(
+      md.includes("**Thinking** · on by default \\(high\\) · levels: max, xhigh, high, low, none · /v1/models"),
+      md,
+    );
+  });
+
+  it("uses the Flex entry's own catalog data when its id is listed", () => {
+    const map = buildThinkingMap(doc([
+      { id: "model-a-flex", metadata: { reasoning: { mandatory: true, supported_efforts: ["max", "high"] } } },
+      { id: "model-a", metadata: { reasoning: { default_enabled: true, default_effort: "low", supported_efforts: ["low", "none"] } } },
+    ]));
+    const hit = thinkingFor(map, ["model-a-flex", "model-a"]);
+    assert.ok(hit);
+    assert.equal(hit.mandatory, true);
+    const md = buildFlexTooltipMd(entry(), sources(), boardRow(), { pricingUrl: PRICING_URL, thinking: hit });
+    assert.ok(md.includes("**Thinking** · always on · levels: max, high · /v1/models"), md);
+  });
+
+  it("falls back to the base model's data when the Flex id is missing from the catalog", () => {
+    const map = buildThinkingMap(doc([
+      { id: "model-a", metadata: { reasoning: { default_enabled: true, default_effort: "low", supported_efforts: ["low", "none"] } } },
+    ]));
+    const hit = thinkingFor(map, ["model-a-flex", "model-a"]);
+    assert.ok(hit);
+    assert.equal(hit.mandatory, false);
+    const md = buildFlexTooltipMd(entry(), sources(), boardRow(), { pricingUrl: PRICING_URL, thinking: hit });
+    assert.ok(md.includes("**Thinking** · on by default \\(low\\) · levels: low, none · /v1/models"), md);
+  });
+
+  it("no Thinking line when neither the Flex id nor the base slug is listed", () => {
+    const map = buildThinkingMap(doc([
+      { id: "model-a", metadata: { reasoning: { default_enabled: true, default_effort: "low", supported_efforts: ["low"] } } },
+    ]));
+    assert.equal(thinkingFor(map, ["model-z-flex", "model-z"]), null);
+    for (const t of [null, undefined]) {
+      const md = buildFlexTooltipMd(entry(), sources(), boardRow(), { pricingUrl: PRICING_URL, thinking: t });
+      assert.ok(!md.includes("**Thinking**"), "no thinking line");
+    }
+  });
+
+  it("output is byte-identical to the ticket-01 baseline when thinking info is absent", () => {
+    const baseline = buildFlexTooltipMd(entry(), sources(), boardRow(), { pricingUrl: PRICING_URL });
+    assert.equal(buildFlexTooltipMd(entry(), sources(), boardRow(), { pricingUrl: PRICING_URL, thinking: null }), baseline);
+    assert.equal(buildFlexTooltipMd(entry(), sources(), boardRow(), { pricingUrl: PRICING_URL, thinking: undefined }), baseline);
+    const tbdBaseline = buildFlexTooltipMd(entry({ provenance: "tbd", membership: "perf-lane" }), sources(), null, { pricingUrl: PRICING_URL });
+    assert.equal(buildFlexTooltipMd(entry({ provenance: "tbd", membership: "perf-lane" }), sources(), null, { pricingUrl: PRICING_URL, thinking: null }), tbdBaseline);
+  });
+
+  it("escapes hostile effort strings in the rendered line", () => {
+    const md = buildFlexTooltipMd(
+      entry(),
+      sources(),
+      boardRow(),
+      { pricingUrl: PRICING_URL, thinking: info({ defaultEffort: "<b>&x", efforts: ["<img src=src>", "(paren)"] }) },
+    );
+    assert.ok(md.includes("**Thinking** · on by default \\(&lt;b&gt;&amp;x\\)"), md);
+    assert.ok(md.includes("levels: &lt;img src=src&gt;, \\(paren\\)"), md);
+    assert.ok(!md.includes("<img"), "no raw html survives");
   });
 });
