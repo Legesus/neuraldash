@@ -3,7 +3,7 @@ import * as path from "path";
 import * as fs from "fs";
 import { BoardTreeProvider } from "./ui/treeProvider";
 import { StatusBarController } from "./ui/statusBar";
-import { pickBestValueQuickPick, pickMyModel } from "./ui/quickPicks";
+import { pickBestValueQuickPick, pickMyModel, pickSortOrder } from "./ui/quickPicks";
 import { CacheManager, createVsCodeStorage } from "./core/cache";
 import { RegistryCacheManager } from "./core/registryCache";
 import type { RegistryCacheData } from "./core/registryCache";
@@ -62,14 +62,12 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("neuraldash.refresh", async () => {
       await controller.manualRefresh();
     }),
-    vscode.commands.registerCommand("neuraldash.sortByEnergy", () => {
-      tree.setSortOrder("energy");
-    }),
-    vscode.commands.registerCommand("neuraldash.sortByValue", () => {
-      tree.setSortOrder("value");
-    }),
-    vscode.commands.registerCommand("neuraldash.sortByName", () => {
-      tree.setSortOrder("name");
+    vscode.commands.registerCommand("neuraldash.setSortOrder", async () => {
+      const chosen = await pickSortOrder(tree.getSortOrder());
+      if (chosen) {
+        tree.setSortOrder(chosen);
+        controller.refreshStatusBar();
+      }
     }),
     vscode.commands.registerCommand("neuraldash.pickBestValue", async () => {
       const cached = await cache.load();

@@ -259,8 +259,8 @@ describe("rowView — buildModelTooltipMd (debugTooltip extraction)", () => {
     assert.ok(!md.includes("no benchmark"));
     assert.ok(!md.includes("typical prompt size"));
     const withBand = buildModelTooltipMd(valued({ basisMwh: 30, quote: { contextBand: "16k-64k" } }), { fetchedAt: null, isBest: false, pricingUrl: "https://portal.neuralwatt.com/energy-pricing", tariff: 10 });
-    assert.ok(withBand.includes("| 30.00 mWh | ranking basis |"));
-    assert.ok(withBand.includes("| 16k-64k | typical prompt size |"));
+    assert.ok(withBand.includes("| Ranking basis | 30.00 mWh |"));
+    assert.ok(withBand.includes("| Prompt size | 16k-64k (typical) |"));
   });
 
   it("labels the board trend against 7d and shows relative update time with the source", () => {
@@ -272,7 +272,7 @@ describe("rowView — buildModelTooltipMd (debugTooltip extraction)", () => {
       now: new Date("2026-09-04T00:04:00Z"),
     });
     assert.ok(md.includes("▼ 23% vs 7d</span>"));
-    assert.ok(md.includes("_Updated 4m ago · portal.neuralwatt.com/energy-pricing · 2026-09-04T00:00:00Z_"));
+    assert.ok(md.includes("_Updated 4m ago · portal.neuralwatt.com/energy-pricing_"));
   });
 
   it("ranks bands by share, hides empty bands, and folds the tail", () => {
@@ -286,10 +286,7 @@ describe("rowView — buildModelTooltipMd (debugTooltip extraction)", () => {
       { band: "256k-1M", mwh: null, sharePct: null },
     ];
     const md = buildModelTooltipMd(valued({ quote: { bands } }), { fetchedAt: null, isBest: false, pricingUrl: "https://portal.neuralwatt.com/energy-pricing", tariff: 10 });
-    const rows = md.split("\n").filter((l) => /^\| \d/.test(l) && l.includes("%"));
-    assert.deepEqual(rows.map((r) => r.split("|")[1].trim()), ["16k-64k", "256-1k", "64k-256k", "4k-16k"]);
-    assert.ok(rows[0].includes("| 0.89 Wh |"), "band energies share one unit");
-    assert.ok(md.includes("_…2 more size bands_"));
+    assert.ok(md.includes("| Top sizes | 16k-64k (42% · 0.89 Wh) · 256-1k (17% · 0.11 Wh) · 64k-256k (16% · 1.11 Wh) · _+3 more_ |"));
     assert.ok(!md.includes("256k-1M"));
   });
 
@@ -397,7 +394,7 @@ describe("manifest — openModelChart command shape", () => {
     for (const m of chartMenus) {
       assert.ok(m.when.includes("view == neuralwatt.board"), "board view gate");
       assert.ok(m.when.includes("viewItem == model"), "model viewItem gate");
-      assert.ok(!m.when.includes("flex.model"), "flex rows excluded");
+      assert.ok(m.when.includes("flex.model"), "flex rows included");
     }
   });
 });

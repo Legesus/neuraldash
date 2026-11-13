@@ -3,7 +3,7 @@
   "displayName": "NeuralDash - Energy Board",
   "description": "Live NeuralWatt energy-per-request board with value ranking and status bar.",
   "publisher": "Legesus",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -30,9 +30,7 @@
     "onView:neuralwatt.board",
     "onView:neuraldash.chart",
     "onCommand:neuraldash.refresh",
-    "onCommand:neuraldash.sortByEnergy",
-    "onCommand:neuraldash.sortByValue",
-    "onCommand:neuraldash.sortByName",
+    "onCommand:neuraldash.setSortOrder",
     "onCommand:neuraldash.pickBestValue",
     "onCommand:neuraldash.setMyModel",
     "onCommand:neuraldash.openPricingPage",
@@ -74,19 +72,10 @@
         "icon": "$(refresh)"
       },
       {
-        "command": "neuraldash.sortByEnergy",
-        "title": "Sort by Energy",
-        "category": "NeuralDash"
-      },
-      {
-        "command": "neuraldash.sortByValue",
-        "title": "Sort by Value",
-        "category": "NeuralDash"
-      },
-      {
-        "command": "neuraldash.sortByName",
-        "title": "Sort by Name",
-        "category": "NeuralDash"
+        "command": "neuraldash.setSortOrder",
+        "title": "Set Sort Order",
+        "category": "NeuralDash",
+        "icon": "$(list-filter)"
       },
       {
         "command": "neuraldash.pickBestValue",
@@ -128,6 +117,11 @@
     "menus": {
       "view/title": [
         {
+          "command": "neuraldash.setSortOrder",
+          "when": "view == neuralwatt.board",
+          "group": "navigation"
+        },
+        {
           "command": "neuraldash.refresh",
           "when": "view == neuralwatt.board",
           "group": "navigation"
@@ -141,12 +135,12 @@
         },
         {
           "command": "neuraldash.openModelChart",
-          "when": "view == neuralwatt.board && (viewItem == model || viewItem == model.best || viewItem == model.preview)",
+          "when": "view == neuralwatt.board && (viewItem == model || viewItem == model.best || viewItem == model.preview || viewItem == flex.model)",
           "group": "inline"
         },
         {
           "command": "neuraldash.openModelChart",
-          "when": "view == neuralwatt.board && (viewItem == model || viewItem == model.best || viewItem == model.preview)",
+          "when": "view == neuralwatt.board && (viewItem == model || viewItem == model.best || viewItem == model.preview || viewItem == flex.model)",
           "group": "navigation"
         }
       ],

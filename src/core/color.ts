@@ -65,11 +65,20 @@ export function severityColor(s: number): string {
   return `hsl(${hInt}, ${sInt}%, 55%)`;
 }
 
+const ICON_PATHS: Record<"zap" | "star", string> = {
+  zap: "M9.5 1 3.5 9.2h3.4L6 15l6.5-8.2H9.1L9.5 1z",
+  star: "M8 1l2.2 4.4 4.8.7-3.5 3.4.8 4.8L8 12.1l-4.3 2.2.8-4.8L1 6.1l4.8-.7z",
+};
+
 /**
- * Basis -> raw 16x16 zap SVG markup string with fill=color.
+ * Basis -> raw 16x16 zap or star SVG markup string with fill=color.
  * null/invalid basis -> grey #808080.
  */
-export function basisToSvgUri(basis: number | null, scale: SeverityScale): string {
+export function basisToSvgUri(
+  basis: number | null,
+  scale: SeverityScale,
+  shape: "zap" | "star" = "zap",
+): string {
   let color: string;
   if (basis == null || !Number.isFinite(basis) || basis <= 0) {
     color = "#808080";
@@ -77,7 +86,5 @@ export function basisToSvgUri(basis: number | null, scale: SeverityScale): strin
     const s = severityOf(basis, scale);
     color = severityColor(s);
   }
-  // 16x16 bolt path matching the extension's zap icon
-  // viewBox 0 0 16 16, path: M9.5 1 L3.5 9.2h3.4L6 15l6.5-8.2H9.1L9.5 1z
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path fill="${color}" d="M9.5 1 3.5 9.2h3.4L6 15l6.5-8.2H9.1L9.5 1z"/></svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path fill="${color}" d="${ICON_PATHS[shape]}"/></svg>`;
 }

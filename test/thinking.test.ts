@@ -179,42 +179,42 @@ describe("thinking - thinkingFor (candidate-id lookup)", () => {
 });
 
 describe("thinking - formatThinkingLine (summary text)", () => {
-  it("on by default with default effort and levels", () => {
+  it("on with default effort and levels", () => {
     assert.equal(
       formatThinkingLine(info()),
-      "**Thinking** · on by default (high) · levels: max, xhigh, high, low, none · /v1/models",
+      "**Thinking** · on (high) · max, xhigh, high, low, none",
     );
   });
 
   it("always on", () => {
     assert.equal(
       formatThinkingLine(info({ mandatory: true, defaultEffort: "max", efforts: ["max", "high", "low"] })),
-      "**Thinking** · always on (max) · levels: max, high, low · /v1/models",
+      "**Thinking** · always on (max) · max, high, low",
     );
   });
 
-  it("off by default omits the default effort even when published", () => {
+  it("off omits the default effort even when published", () => {
     assert.equal(
       formatThinkingLine(info({ defaultEnabled: false, defaultEffort: "high", efforts: ["max", "none"] })),
-      "**Thinking** · off by default · levels: max, none · /v1/models",
+      "**Thinking** · off · max, none",
     );
   });
 
   it("not available", () => {
-    assert.equal(formatThinkingLine(info({ supported: false })), "**Thinking** · not available · /v1/models");
+    assert.equal(formatThinkingLine(info({ supported: false })), "**Thinking** · not available");
   });
 
   it("omits the effort segment when unpublished and the levels segment when empty", () => {
     assert.equal(
       formatThinkingLine(info({ defaultEffort: null, efforts: [] })),
-      "**Thinking** · on by default · /v1/models",
+      "**Thinking** · on",
     );
   });
 
   it("shows efforts verbatim in published order", () => {
     assert.equal(
       formatThinkingLine(info({ defaultEffort: null, efforts: ["zeta", "alpha", "none"] })),
-      "**Thinking** · on by default · levels: zeta, alpha, none · /v1/models",
+      "**Thinking** · on · zeta, alpha, none",
     );
   });
 });
@@ -252,17 +252,17 @@ describe("thinking - model hover seam (buildModelTooltipMd)", () => {
     });
   }
 
-  it("renders the Thinking line after Benchmark and before Prompt size, with the /v1/models source label", () => {
+  it("renders the Thinking line after Benchmark and Top sizes, with the /v1/models source label", () => {
     const md = render(info());
     const bench = md.indexOf("**Benchmark**");
     const think = md.indexOf("**Thinking**");
-    const prompt = md.indexOf("| Prompt size |");
+    const prompt = md.indexOf("| Top sizes |");
     assert.ok(bench >= 0, "benchmark section present");
-    assert.ok(prompt > 0, "prompt-size table present");
+    assert.ok(prompt > 0, "top-sizes row present");
     assert.ok(think > bench, "thinking line after benchmark");
-    assert.ok(prompt > think, "thinking line before prompt-size table");
+    assert.ok(prompt < bench, "top-sizes row precedes benchmark");
     assert.ok(
-      md.includes("**Thinking** · on by default (high) · levels: max, xhigh, high, low, none · /v1/models"),
+      md.includes("**Thinking** · on (high) · max, xhigh, high, low, none"),
       md,
     );
   });
@@ -278,9 +278,9 @@ describe("thinking - model hover seam (buildModelTooltipMd)", () => {
 
   it("escapes hostile catalog strings in the rendered line", () => {
     const md = render(info({ defaultEffort: "<b>&x", efforts: ["<img src=src>", "(paren)", "*em*", "a_b"] }));
-    assert.ok(md.includes("**Thinking** · on by default (&lt;b&gt;&amp;x)"), md);
-    assert.ok(md.includes("levels: &lt;img src=src&gt;, \\(paren\\), \\*em\\*, a\\_b"), md);
-    assert.ok(md.includes("**Thinking** · on by default"), "chrome stays bold, not escaped");
+    assert.ok(md.includes("**Thinking** · on (&lt;b&gt;&amp;x)"), md);
+    assert.ok(md.includes("&lt;img src=src&gt;, \\(paren\\), \\*em\\*, a\\_b"), md);
+    assert.ok(md.includes("**Thinking** · on"), "chrome stays bold, not escaped");
     assert.ok(!md.includes("<img"), "no raw html survives");
   });
 });
@@ -322,7 +322,7 @@ describe("thinking - review fixes", () => {
       defaultEffort: null,
       efforts: [],
     } satisfies ThinkingInfo);
-    assert.equal(formatThinkingLine(map.get("model-k")!), "**Thinking** · not available · /v1/models");
+    assert.equal(formatThinkingLine(map.get("model-k")!), "**Thinking** · not available");
   });
 
   it("entries with neither a reasoning block nor a boolean capabilities flag stay absent", () => {
@@ -336,7 +336,7 @@ describe("thinking - review fixes", () => {
   it("catalog values neutralise markdown emphasis while the chrome stays bold", () => {
     assert.equal(
       formatThinkingLine(info({ defaultEffort: "*x*", efforts: ["_y_", "**z**"] })),
-      "**Thinking** · on by default (\\*x\\*) · levels: \\_y\\_, \\*\\*z\\*\\* · /v1/models",
+      "**Thinking** · on (\\*x\\*) · \\_y\\_, \\*\\*z\\*\\*",
     );
   });
 });
@@ -411,7 +411,7 @@ describe("thinking - same-weights note on lanes with thinking off", () => {
     const map = buildThinkingMap(doc([offEntry("lane-fast", "w"), onEntry("base-a", "w")]));
     assert.equal(
       formatThinkingLine(map.get("lane-fast")!),
-      "**Thinking** \u00b7 not available \u00b7 same weights: on by default (high) \u00b7 /v1/models",
+      "**Thinking** \u00b7 not available \u00b7 same weights: on (high)",
     );
   });
 
@@ -422,7 +422,7 @@ describe("thinking - same-weights note on lanes with thinking off", () => {
     ]));
     assert.equal(
       formatThinkingLine(map.get("lane-fast")!),
-      "**Thinking** \u00b7 not available \u00b7 same weights: always on (max) \u00b7 /v1/models",
+      "**Thinking** \u00b7 not available \u00b7 same weights: always on (max)",
     );
   });
 
@@ -436,7 +436,7 @@ describe("thinking - same-weights note on lanes with thinking off", () => {
     ]));
     assert.equal(
       formatThinkingLine(map.get("lane-fast")!),
-      "**Thinking** \u00b7 not available \u00b7 same weights: off by default \u00b7 /v1/models",
+      "**Thinking** \u00b7 not available \u00b7 same weights: off",
     );
   });
 
@@ -510,7 +510,7 @@ describe("thinking - same-weights note on lanes with thinking off", () => {
       onEntry("base-a", "w", { defaultEffort: "<b>&x" }),
     ]));
     const line = formatThinkingLine(map.get("lane-fast")!);
-    assert.ok(line.includes("same weights: on by default (&lt;b&gt;&amp;x)"), line);
+    assert.ok(line.includes("same weights: on (&lt;b&gt;&amp;x)"), line);
     assert.ok(!line.includes("<b>"), line);
   });
 
@@ -561,6 +561,6 @@ describe("thinking - same-weights note on lanes with thinking off", () => {
       tariff: 10,
       thinking: map.get("lane-fast") ?? null,
     });
-    assert.ok(md.includes("**Thinking** \u00b7 not available \u00b7 same weights: on by default (high) \u00b7 /v1/models"), md);
+    assert.ok(md.includes("**Thinking** \u00b7 not available \u00b7 same weights: on (high)"), md);
   });
 });

@@ -7,7 +7,8 @@ import type { FlexEntry, FlexSources } from "../core/flexCatalog";
 import { formatFlexEntryDescription } from "../core/flexCatalog";
 import { modelRowDescription, buildModelTooltipMd } from "../core/rowView";
 import { buildFlexTooltipMd } from "../core/flexHover";
-import { sortValued, energySortKey, partitionByEnergy } from "../core/ranking";
+import { sortValued, sortFlexEntries, energySortKey, partitionByEnergy, topRankedSlug } from "../core/ranking";
+import type { PerfMetricsDoc } from "../core/perfMetrics";
 import { NEURALWATT_URL } from "../providers/neuralwattProvider";
 import type { ThinkingInfo } from "../core/thinking";
 import { thinkingFor } from "../core/thinking";
@@ -41,7 +42,7 @@ export class BoardTreeProvider implements vscode.TreeDataProvider<vscode.TreeIte
   private bestSlug: string | null = null;
   private snapshot: Snapshot | null = null;
   private tariff: number = 10;
-  private sortOrder: SortOrder = "energy";
+  private sortOrder: SortOrder = "bangForBuck";
   private statusMessage: string | null = null;
   private colorScaleEnabled = true;
   private flexEnabled = true;
@@ -50,10 +51,11 @@ export class BoardTreeProvider implements vscode.TreeDataProvider<vscode.TreeIte
   private registrySource = "";
   private flexSources: FlexSources | null = null;
   private thinking: ReadonlyMap<string, ThinkingInfo> = new Map();
+  private perfDoc: PerfMetricsDoc | null = null;
 
   constructor(private readonly context: vscode.ExtensionContext) {
-    const saved = context.workspaceState.get<SortOrder>("sortOrder");
-    if (saved === "value" || saved === "energy" || saved === "name") this.sortOrder = saved;
+    const saved = context.globalState.get<SortOrder>("neuraldash.sortOrder");
+    if (saved === "bangForBuck" || saved === "fastest" || saved === "lowestPrice") this.sortOrder = saved;
   }
 
   refresh(): void {
@@ -73,6 +75,7 @@ export class BoardTreeProvider implements vscode.TreeDataProvider<vscode.TreeIte
     registrySource = "",
     flexSources: FlexSources | null = null,
     thinking: ReadonlyMap<string, ThinkingInfo> = new Map(),
+    perfDoc: PerfMetricsDoc | null = null,
   ): void {
     this.snapshot = snapshot;
     this.valued = valued;
@@ -82,6 +85,7 @@ export class BoardTreeProvider implements vscode.TreeDataProvider<vscode.TreeIte
     this.registrySource = registrySource;
     this.flexSources = flexSources;
     this.thinking = thinking;
+    this.perfDoc = perfDoc;
     // compute severity scale once per render, over the same energy the rows
     // display and sort by (right-now first) so color tracks the visible order
     const bases = valued.map(energySortKey);
@@ -100,7 +104,7 @@ export class BoardTreeProvider implements vscode.TreeDataProvider<vscode.TreeIte
 
   setSortOrder(order: SortOrder): void {
     this.sortOrder = order;
-    void this.context.workspaceState.update("sortOrder", order);
+    void this.context.globalState.update("neuraldash.sortOrder", order);
     this._onDidChange.fire(undefined);
   }
 
@@ -117,6 +121,8 @@ export class BoardTreeProvider implements vscode.TreeDataProvider<vscode.TreeIte
       tariff: this.tariff,
       registrySource: this.registrySource,
       thinking: this.thinking,
+      flexEntries: this.flexEntries,
+      perfDoc: this.perfDoc,
     };
   }
 
@@ -145,7 +151,7 @@ export class BoardTreeProvider implements vscode.TreeDataProvider<vscode.TreeIte
 
     // Append flex collapsible section when enabled and the catalog has rows
     if (this.flexEnabled && this.flexEntries.length > 0) {
-      rows.push(new FlexSectionItem(this.flexEntries));
+      rows.push(new FlexSectionItem(sortFlexEntries(this.flexEntries, this.valued, this.perfDoc, this.sortOrder)));
     }
     if (noEnergy.length > 0) {
       rows.push(new NoEnergySectionItem(noEnergy));
@@ -156,14 +162,22 @@ export class BoardTreeProvider implements vscode.TreeDataProvider<vscode.TreeIte
   private toFlexItem(entry: FlexEntry): vscode.TreeItem {
     const label = entry.name + (entry.preview ? " (preview)" : "");
     const item = new vscode.TreeItem(label, vscode.TreeItemCollapsibleState.None);
+    item.id = `flex:${entry.slug}`;
     item.description = formatFlexEntryDescription(entry);
     item.contextValue = "flex.model";
+    item.command = { command: "neuraldash.openModelChart", title: "Show 48h trend", arguments: [`flex:${entry.slug}`] };
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path fill="#808080" d="M9.5 1 3.5 9.2h3.4L6 15l6.5-8.2H9.1L9.5 1z"/></svg>`;
     item.iconPath = vscode.Uri.parse("data:image/svg+xml;utf8," + encodeURIComponent(svg));
 
     const md = new vscode.MarkdownString(undefined, true);
     const base = this.valued.find((v) => v.quote.slug === entry.baseSlug) ?? null;
-    md.value = buildFlexTooltipMd(entry, this.flexSources, base, { pricingUrl: NEURALWATT_URL, thinking: thinkingFor(this.thinking, [entry.slug, entry.baseSlug]) });
+    const perfEntry = this.perfDoc?.flex[entry.baseSlug] ?? this.perfDoc?.flex[entry.slug] ?? null;
+    md.value = buildFlexTooltipMd(entry, this.flexSources, base, {
+      pricingUrl: NEURALWATT_URL,
+      thinking: thinkingFor(this.thinking, [entry.slug, entry.baseSlug]),
+      dispatchWait: this.perfDoc ? (perfEntry?.flexDispatchWaitMs ?? null) : undefined,
+      flexHoldBars: this.perfDoc ? (perfEntry?.flexHoldBars ?? null) : undefined,
+    });
     md.isTrusted = true;
     item.tooltip = md;
     return item;
@@ -178,7 +192,8 @@ export class BoardTreeProvider implements vscode.TreeDataProvider<vscode.TreeIte
 
   private toTreeItem(v: ValuedQuote): vscode.TreeItem {
     const label = v.quote.displayName + (v.quote.isPreview ? " (preview)" : "");
-    const isBest = this.bestSlug != null && v.quote.slug === this.bestSlug;
+    const activeBest = topRankedSlug(this.valued, this.sortOrder) ?? this.bestSlug;
+    const isBest = activeBest != null && v.quote.slug === activeBest;
     const item = new vscode.TreeItem(label, vscode.TreeItemCollapsibleState.None);
     // Slug identity: the openModelChart context-menu / inline invocation
     // passes the TreeItem; its core-serialized string `id` is the lookup key
@@ -187,15 +202,17 @@ export class BoardTreeProvider implements vscode.TreeDataProvider<vscode.TreeIte
 
     const mwh = v.descriptionMwh;
     const cost = costPer1kUsd(mwh, this.tariff);
-    item.description = modelRowDescription(mwh, cost, v.quote.sparkline, v.quote.trend);
+    item.description = modelRowDescription(mwh, cost, v.quote.sparkline, v.quote.trend, {
+      sortOrder: this.sortOrder,
+      perf: v.perf,
+      bangForBuck: v.bangForBuck,
+    });
 
-    if (isBest) {
-      item.iconPath = new vscode.ThemeIcon("star-full");
-    } else if (this.colorScaleEnabled) {
-      const svg = basisToSvgUri(energySortKey(v), this.scale);
+    if (this.colorScaleEnabled) {
+      const svg = basisToSvgUri(energySortKey(v), this.scale, isBest ? "star" : "zap");
       item.iconPath = vscode.Uri.parse("data:image/svg+xml;utf8," + encodeURIComponent(svg));
     } else {
-      item.iconPath = new vscode.ThemeIcon("zap");
+      item.iconPath = new vscode.ThemeIcon(isBest ? "star-full" : "zap");
     }
     item.contextValue = isBest ? "model.best" : v.quote.isPreview ? "model.preview" : "model";
 
@@ -211,6 +228,7 @@ export class BoardTreeProvider implements vscode.TreeDataProvider<vscode.TreeIte
       pricingUrl: NEURALWATT_URL,
       tariff: this.tariff,
       thinking: this.thinking.get(v.quote.slug) ?? null,
+      sortOrder: this.sortOrder,
     });
     md.isTrusted = true;
     item.tooltip = md;
@@ -232,4 +250,6 @@ export interface BoardSnapshotData {
   tariff: number;
   registrySource: string;
   thinking: ReadonlyMap<string, ThinkingInfo>;
+  flexEntries?: FlexEntry[];
+  perfDoc?: PerfMetricsDoc | null;
 }

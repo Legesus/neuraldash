@@ -88,6 +88,8 @@ export interface ScoreTable {
   scores: Record<string, ScoreEntry>;
 }
 
+import type { ModelPerfMetrics } from "./perfMetrics";
+
 export interface ValuedQuote {
   quote: ModelQuote;
   basisMwh: number | null;
@@ -95,6 +97,8 @@ export interface ValuedQuote {
   value: number | null;
   costPer1kUsd: number | null;
   descriptionMwh: number | null;
+  perf?: ModelPerfMetrics | null;
+  bangForBuck?: number | null;
 }
 
 export interface CacheData {
@@ -105,7 +109,7 @@ export interface CacheData {
   lastCheckedAt: string | null;
 }
 
-export type SortOrder = "energy" | "value" | "name";
+export type SortOrder = "bangForBuck" | "fastest" | "lowestPrice";
 
 export type PreferredBand = "typical" | "auto" | BandKey;
 

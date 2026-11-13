@@ -120,7 +120,7 @@ export function formatPrice(v: number | null, minDigits = 2, maxDigits = 4): str
 export function tierComparisonTable(rows: TierPrice[]): string[] {
   const usable = rows.filter((r) => r.normal != null || r.flex != null);
   if (usable.length === 0) return [];
-  const lines = [`| /1M tok | Normal | → Flex | Saving |`, `|---|---:|---:|---:|`];
+  const lines = [`| /1M tok | Normal | → Flex | Saving |`, `|:---|---:|---:|---:|`];
   for (const r of usable) {
     const pct = savingPct(r.normal, r.flex);
     const saving = pct == null ? "—" : pct > 0 ? `**−${pct.toFixed(0)}%**` : `${(-pct).toFixed(0)}% more`;
@@ -139,7 +139,7 @@ export function flexEnergyTable(
   const unit = pickUnit(consumedMwh, chargedMwh);
   const pct = savingPct(consumedMwh, chargedMwh);
   const saving = pct == null ? "—" : pct > 0 ? `**−${pct.toFixed(0)}%**` : `${(-pct).toFixed(0)}% more`;
-  const lines = [`| Energy / req | Normal | → Flex | Saving |`, `|---|---:|---:|---:|`];
+  const lines = [`| Energy / req | Normal | → Flex | Saving |`, `|:---|---:|---:|---:|`];
   lines.push(`| Charged | ${formatEnergy(consumedMwh, unit)} | ${formatEnergy(chargedMwh, unit)} | ${saving} |`);
   if (normalCostPer1k != null && Number.isFinite(normalCostPer1k)) {
     lines.push(`| Cost / 1k req | ${formatPrice(normalCostPer1k, 2, 2)} | ${formatPrice(normalCostPer1k * multiplier, 2, 2)} | ${saving} |`);

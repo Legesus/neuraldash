@@ -66,61 +66,72 @@ function boardRow(over?: Partial<ValuedQuote>): ValuedQuote {
   };
 }
 
-describe("flexHover - Flex hover markdown parity with the pre-prefactor inline code", () => {
-  it("priced entry with a matched board row: full markdown equals the legacy output", () => {
-    assert.equal(buildFlexTooltipMd(entry(), sources(), boardRow(), { pricingUrl: PRICING_URL }), "**Model A \\(flex\\)** · Flex  \n`model-a-flex` · neuralwatt · Family A\n\nFast tier for Model A.\n\n| /1M tok | Normal | → Flex | Saving |\n|---|---:|---:|---:|\n| Input | $1.00 | $0.60 | **−40%** |\n| Output | $4.00 | $2.40 | **−40%** |\n| Cache read | $0.20 | $0.12 | **−40%** |\n\n131k context tokens · Flex multiplier 0.7× · Normal from /v1/models\n\n| Energy / req | Normal | → Flex | Saving |\n|---|---:|---:|---:|\n| Charged | 22.31 mWh | 15.62 mWh | **−30%** |\n| Cost / 1k req | $0.22 | $0.16 | **−30%** |\n\n_Consumed = board right-now for `model-a` · charged = consumed × Flex multiplier · updated 2026-11-01_\n\n_Sources: perf view 11-08 10:29 · /v1/models 11-08 10:30 · pricing exact_\n\n\n[Copy Slug](command:neuraldash.copySlug?%7B%22slug%22%3A%22model-a-flex%22%7D) · [Open Pricing Page ↗](<https://portal.neuralwatt.com/energy-pricing>)");
+describe("flexHover - Flex hover markdown (Variant B KPI strip + tables)", () => {
+  it("priced entry with a matched board row: includes KPI strip, price table, energy table, and provenance", () => {
+    const md = buildFlexTooltipMd(entry(), sources(), boardRow(), { pricingUrl: PRICING_URL });
+    assert.ok(md.includes("| Flex in/out (1M) | Dispatch wait | Multiplier |"));
+    assert.ok(md.includes("| **$0.60 / $2.40** | — | **0.7×** |"));
+    assert.ok(md.includes("| vs Normal below | — | 131k ctx |"));
+    assert.ok(md.includes("| Input | $1.00 | $0.60 | **−40%** |"));
+    assert.ok(md.includes("| Charged | 22.31 mWh | 15.62 mWh | **−30%** |"));
+    assert.ok(!md.includes("Cache read"), "drops Cache read row");
+    assert.ok(!md.includes("_Consumed ="), "drops formula footnote");
+    assert.ok(!md.includes("Fast tier for Model A."), "drops description paragraph");
+    assert.ok(md.includes("_Sources: perf · /v1/models · exact_"));
   });
 
-  it("TBD-priced entry: full markdown equals the legacy output", () => {
-    assert.equal(
-      buildFlexTooltipMd(
-        entry({
-          slug: "model-b-flex",
-          baseSlug: "model-b",
-          name: "Model B (flex)",
-          family: null,
-          context: null,
-          inputPerMillion: null,
-          outputPerMillion: null,
-          cacheReadPerMillion: null,
-          provenance: "tbd",
-          membership: "perf-lane",
-          flexMultiplier: null,
-          multiplierOrigin: null,
-          tbdReason: "multiplier unavailable: document publishes no flex multiplier",
-          description: null,
-          lastUpdated: null,
-          preview: true,
-          standard: null,
-        }),
-        sources({ perf: { url: "https://portal.neuralwatt.com/energy-pricing?view=performance", fetchedAt: null } }),
-        boardRow(),
-        { pricingUrl: PRICING_URL },
-      ),
-      "**Model B \\(flex\\)** · Flex  \n`model-b-flex` · neuralwatt\n\n_Pricing TBD: multiplier unavailable: document publishes no flex multiplier_\n\n- context tokens\n\n_No live energy data for Flex rows_\n\n_Sources: perf view time unknown · pricing TBD_\n\n\n[Copy Slug](command:neuraldash.copySlug?%7B%22slug%22%3A%22model-b-flex%22%7D) · [Open Pricing Page ↗](<https://portal.neuralwatt.com/energy-pricing>)",
+  it("TBD-priced entry: shows TBD reason in KPI strip and no live energy", () => {
+    const md = buildFlexTooltipMd(
+      entry({
+        slug: "model-b-flex",
+        baseSlug: "model-b",
+        name: "Model B (flex)",
+        family: null,
+        context: null,
+        inputPerMillion: null,
+        outputPerMillion: null,
+        cacheReadPerMillion: null,
+        provenance: "tbd",
+        membership: "perf-lane",
+        flexMultiplier: null,
+        multiplierOrigin: null,
+        tbdReason: "multiplier unavailable: document publishes no flex multiplier",
+        description: null,
+        lastUpdated: null,
+        preview: true,
+        standard: null,
+      }),
+      sources({ perf: { url: "https://portal.neuralwatt.com/energy-pricing?view=performance", fetchedAt: null } }),
+      boardRow(),
+      { pricingUrl: PRICING_URL },
     );
+    assert.ok(md.includes("| — | — | — |"));
+    assert.ok(md.includes("multiplier unavailable: document publishes no flex multiplier"));
+    assert.ok(!md.includes("_No live energy data"), "drops no-energy footnote");
+    assert.ok(md.includes("_Sources: perf · TBD_"));
   });
 
-  it("entry with no matched board row: full markdown equals the legacy output", () => {
-    assert.equal(
-      buildFlexTooltipMd(
-        entry({
-          slug: "model-c-flex",
-          baseSlug: "model-c",
-          name: "Model C (flex)",
-          family: "Family C",
-          context: 65536,
-          lastUpdated: "2026-10-30",
-        }),
-        sources({ v1: { url: "https://api.neuralwatt.com/v1/models", fetchedAt: "2026-11-08T09:00:00Z" }, perf: null }),
-        null,
-        { pricingUrl: PRICING_URL },
-      ),
-      "**Model C \\(flex\\)** · Flex  \n`model-c-flex` · neuralwatt · Family C\n\nFast tier for Model A.\n\n| /1M tok | Normal | → Flex | Saving |\n|---|---:|---:|---:|\n| Input | $1.00 | $0.60 | **−40%** |\n| Output | $4.00 | $2.40 | **−40%** |\n| Cache read | $0.20 | $0.12 | **−40%** |\n\n66k context tokens · Flex multiplier 0.7× · Normal from /v1/models\n\n_No live energy data for Flex rows · updated 2026-10-30_\n\n_Sources: perf view time unknown · /v1/models 11-08 09:00 · pricing exact_\n\n\n[Copy Slug](command:neuraldash.copySlug?%7B%22slug%22%3A%22model-c-flex%22%7D) · [Open Pricing Page ↗](<https://portal.neuralwatt.com/energy-pricing>)",
+  it("entry with no matched board row: shows KPI strip + price table + no live energy", () => {
+    const md = buildFlexTooltipMd(
+      entry({
+        slug: "model-c-flex",
+        baseSlug: "model-c",
+        name: "Model C (flex)",
+        family: "Family C",
+        context: 65536,
+        lastUpdated: "2026-10-30",
+      }),
+      sources({ v1: { url: "https://api.neuralwatt.com/v1/models", fetchedAt: "2026-11-08T09:00:00Z" }, perf: null }),
+      null,
+      { pricingUrl: PRICING_URL },
     );
+    assert.ok(md.includes("| **$0.60 / $2.40** | — | **0.7×** |"));
+    assert.ok(md.includes("| vs Normal below | — | 66k ctx |"));
+    assert.ok(md.includes("| Input | $1.00 | $0.60 | **−40%** |"));
+    assert.ok(md.includes("_Sources: perf · /v1/models · exact_"));
   });
 
-  it("hostile name, slug and description are escaped, and the command arg stays hazard-free", () => {
+  it("hostile name and slug are escaped, and the command arg stays hazard-free", () => {
     const md = buildFlexTooltipMd(
       entry({ name: "<img src=x onerror=1>", slug: "p(a)r`en`[x]", description: "<script>alert(1)</script>" }),
       null,
@@ -130,7 +141,6 @@ describe("flexHover - Flex hover markdown parity with the pre-prefactor inline c
     assert.ok(!md.includes("<img"), "raw <img must never survive into md.value");
     assert.ok(!md.includes("<script>"), "raw <script> must never survive into md.value");
     assert.ok(md.includes("&lt;img src=x onerror=1&gt;"), "name renders as literal text via entities");
-    assert.ok(md.includes("&lt;script&gt;alert\\(1\\)&lt;/script&gt;"), "description renders as literal text via entities");
     assert.ok(md.includes("`p\\(a\\)r\\`en\\`\\[x\\]`"), "slug escapes parens, backticks and brackets");
     assert.ok(md.includes("%28") && md.includes("%29"), "copySlug arg percent-encodes parentheses");
     assert.equal(md.match(/command:neuraldash\.copySlug\?[^)]+\)/g)?.length, 1, "exactly one closed copySlug link");
@@ -154,16 +164,16 @@ describe("flexHover - thinking line on Flex hovers", () => {
     return { data } as unknown as NeuralwattModelsDoc;
   }
 
-  it("renders the Thinking line after the context/multiplier notes line, before the energy table", () => {
+  it("renders the Thinking line after the unified table and before Sources", () => {
     const md = buildFlexTooltipMd(entry(), sources(), boardRow(), { pricingUrl: PRICING_URL, thinking: info() });
-    const notes = md.indexOf("context tokens");
+    const charged = md.indexOf("| Charged |");
     const think = md.indexOf("**Thinking**");
-    const energy = md.indexOf("| Energy / req |");
-    assert.ok(notes > 0, "tier notes line present");
-    assert.ok(think > notes, "thinking line after the notes line");
-    assert.ok(energy > think, "thinking line before the energy table");
+    const src = md.indexOf("_Sources:");
+    assert.ok(charged > 0, "charged row present in unified table");
+    assert.ok(think > charged, "thinking line after unified table");
+    assert.ok(src > think, "thinking line before Sources");
     assert.ok(
-      md.includes("**Thinking** · on by default (high) · levels: max, xhigh, high, low, none · /v1/models"),
+      md.includes("**Thinking** · on (high) · max, xhigh, high, low, none"),
       md,
     );
   });
@@ -177,7 +187,7 @@ describe("flexHover - thinking line on Flex hovers", () => {
     assert.ok(hit);
     assert.equal(hit.mandatory, true);
     const md = buildFlexTooltipMd(entry(), sources(), boardRow(), { pricingUrl: PRICING_URL, thinking: hit });
-    assert.ok(md.includes("**Thinking** · always on · levels: max, high · /v1/models"), md);
+    assert.ok(md.includes("**Thinking** · always on · max, high"), md);
   });
 
   it("falls back to the base model's data when the Flex id is missing from the catalog", () => {
@@ -188,7 +198,7 @@ describe("flexHover - thinking line on Flex hovers", () => {
     assert.ok(hit);
     assert.equal(hit.mandatory, false);
     const md = buildFlexTooltipMd(entry(), sources(), boardRow(), { pricingUrl: PRICING_URL, thinking: hit });
-    assert.ok(md.includes("**Thinking** · on by default (low) · levels: low, none · /v1/models"), md);
+    assert.ok(md.includes("**Thinking** · on (low) · low, none"), md);
   });
 
   it("no Thinking line when neither the Flex id nor the base slug is listed", () => {
@@ -217,9 +227,9 @@ describe("flexHover - thinking line on Flex hovers", () => {
       boardRow(),
       { pricingUrl: PRICING_URL, thinking: info({ defaultEffort: "<b>&x", efforts: ["<img src=src>", "(paren)", "*em*", "a_b"] }) },
     );
-    assert.ok(md.includes("**Thinking** · on by default (&lt;b&gt;&amp;x)"), md);
-    assert.ok(md.includes("levels: &lt;img src=src&gt;, \\(paren\\), \\*em\\*, a\\_b"), md);
-    assert.ok(md.includes("**Thinking** · on by default"), "chrome stays bold, not escaped");
+    assert.ok(md.includes("**Thinking** · on (&lt;b&gt;&amp;x)"), md);
+    assert.ok(md.includes("&lt;img src=src&gt;, \\(paren\\), \\*em\\*, a\\_b"), md);
+    assert.ok(md.includes("**Thinking** · on"), "chrome stays bold, not escaped");
     assert.ok(!md.includes("<img"), "no raw html survives");
   });
 });
@@ -233,6 +243,6 @@ describe("flexHover - same-weights thinking note on Flex hovers", () => {
       ],
     } as unknown as NeuralwattModelsDoc);
     const md = buildFlexTooltipMd(entry(), sources(), boardRow(), { pricingUrl: PRICING_URL, thinking: map.get("lane-fast") ?? null });
-    assert.ok(md.includes("**Thinking** \u00b7 not available \u00b7 same weights: on by default (high) \u00b7 /v1/models"), md);
+    assert.ok(md.includes("**Thinking** \u00b7 not available \u00b7 same weights: on (high)"), md);
   });
 });

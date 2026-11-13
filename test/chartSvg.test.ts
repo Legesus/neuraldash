@@ -309,4 +309,15 @@ describe("chartSvg — buildTrendChartSvg", () => {
       assert.ok(!svg.includes("Infinity"), "no Infinity");
     }
   });
+
+  it("places right-side indicator pill tags without vertical overlap", () => {
+    const svg = buildTrendChartSvg(spark(), { typicalMwh: 15, width: 420, height: 220 })!;
+    assert.ok(svg.includes('class="now-label"'), "now pill tag rendered");
+    const ys = [...svg.matchAll(/<rect x="[^"]+" y="([\d.-]+)"/g)].map((m) => Number(m[1]));
+    assert.ok(ys.length >= 4, "renders pill rects for tags");
+    ys.sort((a, b) => a - b);
+    for (let i = 1; i < ys.length; i++) {
+      assert.ok(ys[i]! - ys[i - 1]! >= 15.9, `tags must not overlap: ${ys[i - 1]} vs ${ys[i]}`);
+    }
+  });
 });

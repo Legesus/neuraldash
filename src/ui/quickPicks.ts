@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import type { ValuedQuote } from "../core/types";
+import type { SortOrder, ValuedQuote } from "../core/types";
 import { formatMwh } from "../core/energy";
 
 export async function pickBestValueQuickPick(valued: ValuedQuote[]): Promise<void> {
@@ -71,4 +71,29 @@ export async function pickMyModel(valued: ValuedQuote[]): Promise<string | undef
   if (!chosen) return undefined;
   if (chosen.description === "" && chosen.label.includes("Clear")) return "";
   return chosen.description;
+}
+
+export async function pickSortOrder(current: SortOrder): Promise<SortOrder | undefined> {
+  const options: Array<vscode.QuickPickItem & { mode: SortOrder }> = [
+    {
+      label: "$(star-full) Bang for Buck",
+      description: current === "bangForBuck" ? "active" : undefined,
+      detail: "Throughput p50 (tok/s) divided by energy per request (mWh) — higher is better",
+      mode: "bangForBuck",
+    },
+    {
+      label: "$(zap) Fastest",
+      description: current === "fastest" ? "active" : undefined,
+      detail: "Throughput p50 descending, tiebreak first-token latency (TTFT) p50 ascending",
+      mode: "fastest",
+    },
+    {
+      label: "$(credit-card) Lowest Price",
+      description: current === "lowestPrice" ? "active" : undefined,
+      detail: "Energy per request ascending, cost per 1k tiebreak",
+      mode: "lowestPrice",
+    },
+  ];
+  const chosen = await vscode.window.showQuickPick(options, { placeHolder: "Select NeuralDash board sort order" });
+  return chosen?.mode;
 }

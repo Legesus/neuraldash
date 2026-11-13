@@ -76,4 +76,12 @@ describe("color.severityOf", () => {
     assert.ok(svgExp.includes("hsl(0"), `expensive red ${svgExp}`);
     assert.ok(svgCheap.includes('viewBox="0 0 16 16"'));
   });
+  it("basisToSvgUri supports star shape with identical severity color", () => {
+    const scale = computeSeverityScale([10, 100]);
+    const starCheap = basisToSvgUri(10, scale, "star");
+    const starExp = basisToSvgUri(100, scale, "star");
+    assert.ok(starCheap.includes("hsl(130"), `cheap star ${starCheap}`);
+    assert.ok(starExp.includes("hsl(0"), `expensive star ${starExp}`);
+    assert.notEqual(starCheap, basisToSvgUri(10, scale, "zap"));
+  });
 });

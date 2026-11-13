@@ -6,7 +6,8 @@
  * Old-cache contract: every function here keys off sparkline presence, so a
  * pre-feature snapshot (field undefined) renders exactly the legacy output.
  */
-import type { Sparkline48h, SparklineDirection, TrendInfo, ValuedQuote } from "./types";
+import type { SortOrder, Sparkline48h, SparklineDirection, TrendInfo, ValuedQuote } from "./types";
+import type { FlexHoldBars, ModelPerfMetrics, P50P95, ThroughputSparkline } from "./perfMetrics";
 import { boardTrendLabel, formatEnergy, formatEnergyRange, isContextBandText, pickUnit, rankBands, sameEnergy, textSparkline } from "./cardFormat";
 import type { SeverityScale } from "./color";
 import { basisToSvgUri } from "./color";
@@ -16,23 +17,58 @@ import { sparklineToPngBytes } from "./sparklinePng";
 import { formatThinkingLine } from "./thinking";
 import type { ThinkingInfo } from "./thinking";
 
+export function formatLatencyMs(ms: number | null | undefined): string {
+  if (ms == null || !Number.isFinite(ms)) return "\u2014";
+  return ms >= 1000 ? `${(ms / 1000).toFixed(2)} s` : `${Math.round(ms)} ms`;
+}
+
+export function ttftDotColor(ms: number): string {
+  if (ms < 300) return "#4ec9b0";
+  if (ms < 1000) return "#dcdcaa";
+  return "#ce9178";
+}
+
+export function sortBadgeLabel(order: SortOrder | undefined): string {
+  if (order === "bangForBuck") return "Top Efficiency";
+  if (order === "fastest") return "Speed Leader";
+  if (order === "lowestPrice") return "Lowest Cost";
+  return "Best value";
+}
+
 /**
- * Compose the tree-row description. Exact legacy shape when spark is absent:
- * `${formatMwh(mwh)} · $${cost.toFixed(2)}/1k`, or "-" when mwh is null.
- * With spark present, only the trend arrow + pct is appended (the lo/hi
- * range lives in the hover tooltip, not the row).
+ * Compose the tree-row description. Legacy shape when `opts?.sortOrder` is
+ * omitted; otherwise wired to the active sort mode with `—` for missing metrics.
  */
 export function modelRowDescription(
   mwh: number | null,
   cost: number | null,
   spark: Sparkline48h | null | undefined,
   trend: TrendInfo | null,
+  opts?: { sortOrder?: SortOrder; perf?: ModelPerfMetrics | null; bangForBuck?: number | null },
 ): string {
   const suffix = sparklineDescriptionSuffix(spark, trend);
-  if (mwh != null) {
-    return `${formatMwh(mwh)} · $${(cost ?? 0).toFixed(2)}/1k${suffix}`;
+  const order = opts?.sortOrder;
+  if (!order) {
+    if (mwh != null) {
+      return `${formatMwh(mwh)} · $${(cost ?? 0).toFixed(2)}/1k${suffix}`;
+    }
+    return suffix.trim() ? suffix.trim() : "-";
   }
-  return suffix.trim() ? suffix.trim() : "-";
+
+  const energyStr = mwh != null ? formatMwh(mwh) : "\u2014";
+  const tokP50 = opts.perf?.throughputToks?.p50 ?? null;
+  const tokStr = tokP50 != null ? `${Math.round(tokP50)} tok/s` : "\u2014 tok/s";
+  const ttftStr = formatLatencyMs(opts.perf?.firstTokenMs?.p50);
+
+  if (order === "bangForBuck") {
+    const ratioStr = opts.bangForBuck != null ? `${opts.bangForBuck.toFixed(1)} tok/s\u00b7mWh` : "\u2014 tok/s\u00b7mWh";
+    return `${ratioStr} \u00b7 ${tokStr} \u00b7 ${energyStr}${suffix}`;
+  }
+  if (order === "fastest") {
+    return `${tokStr} \u00b7 ${ttftStr} \u00b7 ${energyStr}${suffix}`;
+  }
+  const costStr = cost != null && mwh != null ? `$${cost.toFixed(2)}/1k` : "\u2014";
+  return `${energyStr} \u00b7 ${costStr} \u00b7 ${tokStr}${suffix}`;
 }
 
 /**
@@ -104,7 +140,15 @@ export function sparklineTooltipRow(spark: Sparkline48h | null | undefined, slug
  */
 export function buildModelTooltipMd(
   v: ValuedQuote,
-  opts: { fetchedAt: string | null; isBest: boolean; pricingUrl: string; tariff: number; now?: Date; thinking?: ThinkingInfo | null },
+  opts: {
+    fetchedAt: string | null;
+    isBest: boolean;
+    pricingUrl: string;
+    tariff: number;
+    now?: Date;
+    thinking?: ThinkingInfo | null;
+    sortOrder?: SortOrder;
+  },
 ): string {
   const q = v.quote;
   const mwh = v.descriptionMwh;
@@ -116,23 +160,62 @@ export function buildModelTooltipMd(
     ? ` · <span style="color:${TREND_COLORS[boardTrendDirection(q.trend)]};">${boardTrend}</span>`
     : "";
   lines.push(`**${escapeMarkdownLocal(q.displayName)}**${trendBadge}  \n\`${escapeMarkdownLocal(q.slug)}\``);
-  if (opts.isBest) lines.push(`\n$(star-full) **Best value**`);
+  if (opts.isBest) lines.push(`\n$(star-full) **${sortBadgeLabel(opts.sortOrder)}**`);
   lines.push("");
 
-  lines.push(`| Energy | |`);
-  lines.push(`|---|---|`);
-  lines.push(`| **${formatEnergy(q.rightNowMwh)}** | right now |`);
-  const typicalExtras = [`7d typical`];
-  if (cost != null && mwh != null) typicalExtras.push(`$${cost.toFixed(2)}/1k`);
-  if (q.cachePct != null) typicalExtras.push(`${q.cachePct}% cache`);
-  lines.push(`| ${formatEnergy(q.typicalMwh)} | ${typicalExtras.join(" · ")} |`);
-  if (v.basisMwh != null && !sameEnergy(v.basisMwh, q.typicalMwh)) {
-    lines.push(`| ${formatEnergy(v.basisMwh)} | ranking basis |`);
+  // KPI Hero strip (3-col summary)
+  const tok = v.perf?.throughputToks ?? null;
+  const ttft = v.perf?.firstTokenMs ?? null;
+  const cacheVal = v.perf?.cacheHitPct ?? q.cachePct ?? null;
+  const energySub = [cost != null && mwh != null ? `$${cost.toFixed(2)}/1k` : null, q.typicalMwh != null ? `${formatEnergy(q.typicalMwh)} 7d` : null]
+    .filter(Boolean)
+    .join(" · ");
+  const tokSub = [tok ? `p95 ${Math.round(tok.p95)}` : null, cacheVal != null ? `${cacheVal}%` : null]
+    .filter(Boolean)
+    .join(" · ");
+  const ttftHead = ttft
+    ? `<span style="color:${ttftDotColor(ttft.p50)};">\u25cf</span> **${formatLatencyMs(ttft.p50)}**`
+    : "\u2014";
+  const ttftSub = ttft ? `p95 ${formatLatencyMs(ttft.p95)}` : "\u2014";
+
+  lines.push(`---`);
+  lines.push(`| Energy | Throughput | First token |`);
+  lines.push(`|:---|:---:|---:|`);
+  lines.push(`| **${formatEnergy(q.rightNowMwh ?? q.typicalMwh)}** | ${tok ? `**${Math.round(tok.p50)} tok/s**` : "\u2014"} | ${ttftHead} |`);
+  lines.push(`| ${energySub || "\u2014"} | ${tokSub || "\u2014"} | ${ttftSub} |`);
+  lines.push(`---`);
+
+  // Unified detail grid
+  const detailRows: string[] = [];
+  if (v.bangForBuck != null) {
+    detailRows.push(`| Bang for Buck | **${v.bangForBuck.toFixed(2)} tok/s\u00b7mWh** |`);
   }
-  const trendRow = sparklineCardRow(q.sparkline, q.slug);
-  if (trendRow) lines.push(trendRow);
-  if (isContextBandText(q.contextBand)) {
-    lines.push(`| ${escapeMarkdownLocal(q.contextBand!)} | typical prompt size |`);
+  if (v.basisMwh != null && !sameEnergy(v.basisMwh, q.typicalMwh)) {
+    detailRows.push(`| Ranking basis | ${formatEnergy(v.basisMwh)} |`);
+  }
+  const energySpark = sparklineCardRow(q.sparkline, q.slug);
+  if (energySpark) detailRows.push(energySpark);
+  const perfSpark = throughputSparklineRow(v.perf?.throughputSparkline);
+  if (perfSpark) detailRows.push(perfSpark);
+  const { shown, hiddenCount } = rankBands(q.bands, 3);
+  if (shown.length > 0) {
+    const unit = pickUnit(...shown.map((b) => b.mwh));
+    const bandSummary = shown
+      .map((b) => {
+        const energyPart = b.mwh != null ? ` · ${formatEnergy(b.mwh, unit)}` : "";
+        return `${escapeMarkdownLocal(b.band)} (${b.sharePct.toFixed(0)}%${energyPart})`;
+      })
+      .join(" · ");
+    detailRows.push(`| Top sizes | ${bandSummary}${hiddenCount > 0 ? ` · _+${hiddenCount} more_` : ""} |`);
+  } else if (isContextBandText(q.contextBand)) {
+    detailRows.push(`| Prompt size | ${escapeMarkdownLocal(q.contextBand!)} (typical) |`);
+  }
+
+  if (detailRows.length > 0) {
+    lines.push("");
+    lines.push(`| | |`);
+    lines.push(`|---|---|`);
+    lines.push(...detailRows);
   }
 
   if (v.score) {
@@ -144,24 +227,48 @@ export function buildModelTooltipMd(
 
   if (opts.thinking) lines.push("", formatThinkingLine(opts.thinking));
 
-  const { shown, hiddenCount } = rankBands(q.bands);
-  if (shown.length > 0) {
-    const unit = pickUnit(...shown.map((b) => b.mwh));
-    lines.push("");
-    lines.push(`| Prompt size | Traffic | Share | Energy |`);
-    lines.push(`|---|---|---:|---:|`);
-    for (const b of shown) {
-      lines.push(`| ${escapeMarkdownLocal(b.band)} | ${b.bar} | ${b.sharePct.toFixed(0)}% | ${formatEnergy(b.mwh, unit)} |`);
-    }
-    if (hiddenCount > 0) lines.push(`\n_…${hiddenCount} more size ${hiddenCount === 1 ? "band" : "bands"}_`);
-  }
-
   if (opts.fetchedAt) {
     const age = humanizeAge(opts.fetchedAt, opts.now);
-    lines.push(`\n_Updated ${escapeMarkdownLocal(age)} · ${escapeMarkdownLocal(sourceLabel(opts.pricingUrl))} · ${escapeMarkdownLocal(opts.fetchedAt)}_`);
+    lines.push(`\n_Updated ${escapeMarkdownLocal(age)} · ${escapeMarkdownLocal(sourceLabel(opts.pricingUrl))}_`);
   }
   lines.push(tooltipFooter(opts.pricingUrl, q.slug));
   return lines.join("\n");
+}
+
+const SPARK_LADDER = ["\u2581", "\u2582", "\u2583", "\u2584", "\u2585", "\u2586", "\u2587", "\u2588"];
+
+export function flexHoldBarsToText(hold: FlexHoldBars | null | undefined, width = 16): string | null {
+  if (!hold || hold.bars.length === 0) return null;
+  const maxH = Math.max(...hold.bars.map((b) => b.height), 0);
+  if (maxH <= 0) return SPARK_LADDER[0]!.repeat(width);
+  const buckets = new Array<number>(width).fill(0);
+  for (const b of hold.bars) {
+    const idx = Math.min(width - 1, Math.max(0, Math.floor((b.x / 136) * width)));
+    if (b.height > buckets[idx]!) buckets[idx] = b.height;
+  }
+  return buckets
+    .map((h) => SPARK_LADDER[Math.min(7, Math.round((h / maxH) * 7))]!)
+    .join("");
+}
+
+function throughputSparklineRow(spark: ThroughputSparkline | null | undefined): string | null {
+  if (!spark) return null;
+  const glyphs = textSparkline(spark.points);
+  if (!glyphs) return null;
+  const parts = ["48h"];
+  if (spark.minToks != null && spark.maxToks != null) {
+    parts.push(`${Math.round(spark.minToks)}\u2013${Math.round(spark.maxToks)} tok/s`);
+  }
+  if (spark.refY != null) {
+    const lastY = spark.points[spark.points.length - 1]!.y;
+    // SVG y=0 is top: smaller y means higher throughput.
+    const above = lastY < spark.refY - 1;
+    const below = lastY > spark.refY + 1;
+    const color = above ? "#4ec9b0" : below ? "#ce9178" : "#8c8c8c";
+    const label = above ? "\u25b2 above 7d" : below ? "\u25bc below 7d" : "\u2248 in line";
+    parts.push(`<span style="color:${color};">${label}</span>`);
+  }
+  return `| ${glyphs} | ${parts.join(" \u00b7 ")} |`;
 }
 
 function boardTrendDirection(trend: TrendInfo | null): SparklineDirection {

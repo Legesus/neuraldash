@@ -146,18 +146,17 @@ function catalogValue(value: string): string {
 }
 
 function stateWording(info: Pick<ThinkingInfo, "mandatory" | "defaultEnabled" | "defaultEffort">): string {
-  const state = info.mandatory ? "always on" : info.defaultEnabled ? "on by default" : "off by default";
-  const effort = state === "off by default" ? null : info.defaultEffort;
+  const state = info.mandatory ? "always on" : info.defaultEnabled ? "on" : "off";
+  const effort = state === "off" ? null : info.defaultEffort;
   return effort != null ? `${state} (${catalogValue(effort)})` : state;
 }
 
 export function formatThinkingLine(info: ThinkingInfo): string {
   if (!info.supported) {
     const note = info.sameWeights ? ` \u00b7 same weights: ${stateWording(info.sameWeights)}` : "";
-    return `**Thinking** \u00b7 not available${note} \u00b7 /v1/models`;
+    return `**Thinking** \u00b7 not available${note}`;
   }
   const parts = [`**Thinking** \u00b7 ${stateWording(info)}`];
-  if (info.efforts.length > 0) parts.push(`levels: ${info.efforts.map((e) => catalogValue(e)).join(", ")}`);
-  parts.push("/v1/models");
+  if (info.efforts.length > 0) parts.push(info.efforts.map((e) => catalogValue(e)).join(", "));
   return parts.join(" \u00b7 ");
 }

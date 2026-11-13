@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { buildChartPlaceholderHtml, buildModelChartHtml, findModelBySlug } from "../core/chartPanel";
+import { buildChartPlaceholderHtml, buildModelChartHtml, findChartTarget } from "../core/chartPanel";
 import type { BoardTreeProvider } from "./treeProvider";
 
 export const CHART_VIEW_ID = "neuraldash.chart";
@@ -34,20 +34,24 @@ export class ChartViewProvider implements vscode.WebviewViewProvider {
   private render(): void {
     if (!this.view) return;
     const board = this.tree.getBoardData();
-    const v = this.slug ? findModelBySlug(board.valued, this.slug) : null;
-    if (!v) {
+    const target = this.slug
+      ? findChartTarget(board.valued, board.flexEntries ?? [], board.perfDoc ?? null, this.slug)
+      : null;
+    if (!target) {
       this.view.description = undefined;
       this.view.webview.html = buildChartPlaceholderHtml(
         this.slug ? `No board data for "${this.slug}" yet. Refresh the board.` : "Click a model in the board to see its 48h trend.",
       );
       return;
     }
-    this.view.description = v.quote.displayName;
-    this.view.webview.html = buildModelChartHtml(v, {
+    this.view.description = target.valued.quote.displayName;
+    this.view.webview.html = buildModelChartHtml(target.valued, {
       fetchedAt: board.snapshot ? board.snapshot.fetchedAt : null,
       tariff: board.tariff,
       sourceUrl: board.snapshot ? board.snapshot.sourceUrl : null,
       compact: true,
+      flex: target.flex,
+      linkedSlug: target.linkedSlug,
     });
   }
 }

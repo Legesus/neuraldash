@@ -21,6 +21,10 @@ export interface TrendChartOptions {
   width?: number;
   height?: number;
   typicalMwh?: number | null;
+  formatValue?: (val: number) => string;
+  color?: string;
+  avgLabel?: string;
+  ariaLabel?: string;
 }
 
 function usablePoints(spark: Sparkline48h | null | undefined): SparklinePoint[] | null {
@@ -69,12 +73,40 @@ function num(n: number): string {
   return Number(n.toFixed(2)).toString();
 }
 
+interface RightTag {
+  targetY: number;
+  placedY: number;
+  cls: string;
+  text: string;
+  bg: string;
+  stroke: string;
+  textColor?: string;
+}
+
+function layoutRightTags(tags: RightTag[], yMin: number, yMax: number, minGap: number): RightTag[] {
+  const sorted = [...tags].sort((a, b) => a.targetY - b.targetY);
+  for (let i = 0; i < sorted.length; i++) {
+    const prev = i === 0 ? yMin : sorted[i - 1]!.placedY + minGap;
+    sorted[i]!.placedY = Math.max(sorted[i]!.targetY, prev);
+  }
+  if (sorted.length > 0 && sorted[sorted.length - 1]!.placedY > yMax) {
+    sorted[sorted.length - 1]!.placedY = yMax;
+    for (let i = sorted.length - 2; i >= 0; i--) {
+      sorted[i]!.placedY = Math.min(sorted[i]!.placedY, sorted[i + 1]!.placedY - minGap);
+    }
+  }
+  for (const t of sorted) {
+    t.placedY = Math.max(yMin, Math.min(yMax, t.placedY));
+  }
+  return sorted;
+}
+
 export function buildTrendChartSvg(spark: Sparkline48h | null | undefined, opts: TrendChartOptions = {}): string | null {
   const summary = summarizeTrend(spark);
   if (!summary || !spark) return null;
   const width = opts.width ?? 720;
   const height = opts.height ?? 240;
-  const pad = { left: 72, right: 112, top: 16, bottom: 30 };
+  const pad = { left: 72, right: 122, top: 16, bottom: 30 };
   const plotW = width - pad.left - pad.right;
   const plotH = height - pad.top - pad.bottom;
 
@@ -85,56 +117,99 @@ export function buildTrendChartSvg(spark: Sparkline48h | null | undefined, opts:
   const span = dHi - dLo || Math.max(Math.abs(dHi), 1) * 0.1;
   dLo = Math.max(0, dLo - span * 0.08);
   dHi = dHi + span * 0.08;
-  const unit = pickUnit(dLo, dHi);
+  const unit = opts.formatValue ? undefined : pickUnit(dLo, dHi);
+  const fmt = opts.formatValue ?? ((val: number) => formatEnergy(val, unit));
+  const fmtExact = opts.formatValue ?? ((val: number) => formatEnergy(val));
 
   const xOf = (hoursAgo: number) => pad.left + plotW * (1 - hoursAgo / TREND_WINDOW_HOURS);
   const yOf = (mwh: number) => pad.top + plotH * (1 - (mwh - dLo) / (dHi - dLo));
 
-  const color = TREND_COLORS[spark.direction] ?? TREND_COLORS.neutral;
+  const color = opts.color ?? TREND_COLORS[spark.direction] ?? TREND_COLORS.neutral;
+  const ariaLabel = opts.ariaLabel ?? "48 hour energy trend";
   const parts: string[] = [];
   parts.push(
-    `<svg class="trend-chart" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="100%" role="img" aria-label="48 hour energy trend">`,
+    `<svg class="trend-chart" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="100%" role="img" aria-label="${ariaLabel}">`,
   );
 
   for (let i = 0; i <= 3; i++) {
     const v = dLo + ((dHi - dLo) * i) / 3;
     const y = yOf(v);
     parts.push(`<line class="grid" x1="${pad.left}" y1="${num(y)}" x2="${pad.left + plotW}" y2="${num(y)}"/>`);
-    parts.push(`<text class="axis" x="${pad.left - 8}" y="${num(y + 4)}" text-anchor="end">${formatEnergy(v, unit)}</text>`);
+    parts.push(`<text class="axis" x="${pad.left - 8}" y="${num(y + 4)}" text-anchor="end">${fmt(v)}</text>`);
   }
   for (const h of [48, 36, 24, 12, 0]) {
     const x = xOf(h);
     parts.push(`<text class="axis" x="${num(x)}" y="${height - 8}" text-anchor="middle">${h === 0 ? "now" : `-${h}h`}</text>`);
   }
 
-  const refLine = (mwh: number, label: string, cls: string) => {
+  const tags: RightTag[] = [];
+  const refLine = (mwh: number, label: string, cls: string, stroke: string) => {
     const y = yOf(mwh);
     parts.push(`<line class="${cls}" x1="${pad.left}" y1="${num(y)}" x2="${pad.left + plotW}" y2="${num(y)}"/>`);
-    parts.push(`<text class="${cls}-label" x="${pad.left + plotW + 6}" y="${num(y + 4)}">${label} ${formatEnergy(mwh, unit)}</text>`);
+    tags.push({
+      targetY: y,
+      placedY: y,
+      cls: `${cls}-label`,
+      text: `${label} ${fmt(mwh)}`,
+      bg: "var(--vscode-editor-background,#1e1e1e)",
+      stroke,
+    });
   };
-  if (typical != null) refLine(typical, "7d", "ref-typical");
-  if (summary.avgMwh != null) refLine(summary.avgMwh, "48h avg", "ref-avg");
+  if (typical != null) refLine(typical, "7d", "ref-typical", "#d4a72c");
+  if (summary.avgMwh != null) refLine(summary.avgMwh, opts.avgLabel ?? "48h avg", "ref-avg", "#666666");
 
   const path = summary.samples.map((s) => `${num(xOf(s.hoursAgo))},${num(yOf(s.mwh))}`).join(" ");
   parts.push(`<polyline class="trend-line" fill="none" stroke="${color}" points="${path}"/>`);
 
   for (const s of summary.samples) {
     parts.push(
-      `<circle class="pt" cx="${num(xOf(s.hoursAgo))}" cy="${num(yOf(s.mwh))}" r="4" fill="${color}"><title>${formatHoursAgo(s.hoursAgo)} · ${formatEnergy(s.mwh)}</title></circle>`,
+      `<circle class="pt" cx="${num(xOf(s.hoursAgo))}" cy="${num(yOf(s.mwh))}" r="4" fill="${color}"><title>${formatHoursAgo(s.hoursAgo)} · ${fmtExact(s.mwh)}</title></circle>`,
     );
   }
 
-  const marker = (s: TrendSample, label: string, cls: string, dy: number) => {
+  const marker = (s: TrendSample, label: string, cls: string) => {
     const x = xOf(s.hoursAgo);
     const y = yOf(s.mwh);
     parts.push(`<circle class="${cls}" cx="${num(x)}" cy="${num(y)}" r="4.5" fill="${color}"/>`);
-    const anchor = x > pad.left + plotW * 0.85 ? "end" : x < pad.left + plotW * 0.15 ? "start" : "middle";
-    parts.push(`<text class="marker-label" x="${num(x)}" y="${num(y + dy)}" text-anchor="${anchor}">${label} ${formatEnergy(s.mwh)}</text>`);
+    tags.push({
+      targetY: y,
+      placedY: y,
+      cls: "marker-label",
+      text: `${label} ${fmtExact(s.mwh)}`,
+      bg: "var(--vscode-editor-background,#1e1e1e)",
+      stroke: color,
+    });
   };
-  marker(summary.high, "hi", "marker", -10);
-  if (summary.low !== summary.high) marker(summary.low, "lo", "marker", 18);
+  marker(summary.high, "hi", "marker");
+  if (summary.low !== summary.high) marker(summary.low, "lo", "marker");
   const last = summary.samples[summary.samples.length - 1];
-  parts.push(`<circle class="now" cx="${num(xOf(last.hoursAgo))}" cy="${num(yOf(last.mwh))}" r="5.5" fill="${color}"/>`);
+  const lastY = yOf(last.mwh);
+  parts.push(`<circle class="now" cx="${num(xOf(last.hoursAgo))}" cy="${num(lastY)}" r="5.5" fill="${color}"/>`);
+  tags.push({
+    targetY: lastY,
+    placedY: lastY,
+    cls: "now-label",
+    text: `now ${fmtExact(last.mwh)}`,
+    bg: color,
+    stroke: color,
+    textColor: "#141414",
+  });
+
+  const tagX = pad.left + plotW + 6;
+  const tagW = pad.right - 10;
+  const laidOut = layoutRightTags(tags, pad.top + 7, pad.top + plotH - 7, 16);
+  for (const t of laidOut) {
+    parts.push(
+      `<line x1="${pad.left + plotW}" y1="${num(t.targetY)}" x2="${tagX}" y2="${num(t.placedY)}" stroke="${t.stroke}" stroke-width="1" opacity="0.65"/>`,
+    );
+    parts.push(
+      `<rect x="${tagX}" y="${num(t.placedY - 7)}" width="${tagW}" height="14" rx="3" fill="${t.bg}" stroke="${t.stroke}" stroke-width="1"/>`,
+    );
+    const fillAttr = t.textColor ? ` fill="${t.textColor}"` : "";
+    parts.push(
+      `<text class="${t.cls}" x="${tagX + 4}" y="${num(t.placedY + 3.5)}"${fillAttr}>${t.text}</text>`,
+    );
+  }
 
   parts.push(`</svg>`);
   return parts.join("");
@@ -147,7 +222,8 @@ export const TREND_CHART_CSS =
   `.trend-chart .trend-line{stroke-width:2;stroke-linejoin:round;stroke-linecap:round;}` +
   `.trend-chart .ref-typical{stroke:var(--vscode-foreground,#ccc);stroke-width:1;stroke-dasharray:6 4;opacity:.7;}` +
   `.trend-chart .ref-avg{stroke:var(--vscode-descriptionForeground,#888);stroke-width:1;stroke-dasharray:2 3;}` +
-  `.trend-chart .ref-typical-label,.trend-chart .ref-avg-label{fill:var(--vscode-descriptionForeground,#888);font-size:11px;}` +
+  `.trend-chart .ref-typical-label,.trend-chart .ref-avg-label{fill:var(--vscode-descriptionForeground,#ccc);font-size:10px;}` +
   `.trend-chart .pt{opacity:0;}.trend-chart .pt:hover{opacity:1;}` +
   `.trend-chart .now{stroke:var(--vscode-editor-background,#1e1e1e);stroke-width:2;}` +
-  `.trend-chart .marker-label{fill:var(--vscode-foreground,#ccc);font-size:11px;}`;
+  `.trend-chart .marker-label{fill:var(--vscode-foreground,#ccc);font-size:10px;}` +
+  `.trend-chart .now-label{font-size:10px;font-weight:700;}`;

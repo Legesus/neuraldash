@@ -27,6 +27,7 @@ const FLEX_SOURCES: readonly string[] = [
   "src/core/displayNames.ts",
   "src/core/thinking.ts",
   "src/core/flexHover.ts",
+  "src/core/perfMetrics.ts",
   "src/providers/neuralwattModelsProvider.ts",
 ];
 

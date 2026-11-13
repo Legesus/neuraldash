@@ -2,6 +2,18 @@
 
 All notable changes to NeuralDash are documented here.
 
+## 0.7.0 — 2026-11-13
+
+Live throughput, TTFT, cache hit %, and 3-mode sorting on the Energy Board:
+
+- **Performance metrics (`?view=performance`)** — parses per-model first-token latency (p50/p95), throughput (p50/p95 tok/s), 7d cache hit %, and Flex-tier dispatch wait (p50/p95) from `https://portal.neuralwatt.com/energy-pricing?view=performance`. Missing values render as `—`; Flex rows never fabricate throughput.
+- **3-mode sort (`NeuralDash: Set Sort Order`)** — replaces the old sort commands with a QuickPick + board toolbar button for **Bang for Buck** (`throughput p50 ÷ energy`, default), **Fastest** (`throughput p50` desc, `TTFT p50` asc), and **Lowest Price** (`energy` asc, cost tiebreak), persisted in `globalState`.
+- **Mode-aware TreeView & tooltips** — TreeView row descriptions lead with the active mode's primary metric; hover tooltips show the TTFT fast/mid/slow dot (`<300ms` green, `<1000ms` yellow, else orange), throughput `p50 · p95`, cache hit %, Bang for Buck ratio, and the active-mode `#1` badge (`Top Efficiency` / `Speed Leader` / `Lowest Cost`).
+- **48h Trend Telemetry Bento & indicator tags** — sidebar 48h Trend view renders a compact KPI grid with average-relative color coding (energy & throughput) and right-side value indicator tags on the SVG charts.
+- **Flex tier sorting, compact hover & 48h Trend** — Flex rows follow the active sort mode, match the compact hover table layout, and open in the 48h Trend view with energy and chart bounds scaled by the published `flex_discount_multiplier`.
+- **Tracking alias resolution** — parses `data-family-pointers` alias links from `?view=performance` so tracking-alias Flex rows resolve to their linked backend model's energy, 48h chart, and performance metrics, showing `<alias> → <backend-slug>` in the 48h Trend header.
+- **Status bar** — shows `neuraldash.myModel` when configured, or pins the `#1` model under the active sort mode as `⚡ <model> · <p50> tok/s · <energy> (<mode>)`.
+
 ## 0.6.0 — 2026-11-08
 
 Thinking effort on hover cards, and a board fix for sub-milliwatt models:

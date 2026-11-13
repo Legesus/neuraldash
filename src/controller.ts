@@ -3,7 +3,9 @@ import type { DataProvider, Snapshot, PreferredBand, SortOrder } from "./core/ty
 import { CacheManager } from "./core/cache";
 import { BoardTreeProvider } from "./ui/treeProvider";
 import { StatusBarController } from "./ui/statusBar";
-import { rankQuotes, bestValueSlug } from "./core/ranking";
+import { rankQuotes, topRankedSlug } from "./core/ranking";
+import { parsePerfMetrics, isPerfMetricsDoc } from "./core/perfMetrics";
+import type { PerfMetricsDoc } from "./core/perfMetrics";
 import { mergedScores, resolveBundledScoresPath } from "./core/scores";
 import { loadModelsRegistry, resolveBundledRegistryPath } from "./core/flex";
 import { transformModelsDevRegistry } from "./core/registryTransform";
@@ -26,7 +28,14 @@ import type { NeuralwattModelsProvider } from "./providers/neuralwattModelsProvi
 import { NEURALWATT_URL } from "./providers/neuralwattProvider";
 
 const ECI_STATE_KEY = "neuraldash.eciDoc";
+const PERF_STATE_KEY = "neuraldash.perfDoc";
 const ECI_REFRESH_MS = 24 * 60 * 60 * 1000;
+
+const SORT_TITLES: Record<SortOrder, string> = {
+  bangForBuck: "Energy Board (Bang for Buck)",
+  fastest: "Energy Board (Fastest)",
+  lowestPrice: "Energy Board (Lowest Price)",
+};
 
 export class Controller {
   private timer: NodeJS.Timeout | null = null;
@@ -48,6 +57,7 @@ export class Controller {
   private flexFetching = false;
   private eciDoc: EciDoc | null = null;
   private eciFetching = false;
+  private perfDoc: PerfMetricsDoc | null = null;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -65,6 +75,7 @@ export class Controller {
 
   async activate(): Promise<void> {
     this.pollMin = this.readPollInterval();
+    this.treeView.title = SORT_TITLES[this.tree.getSortOrder()];
 
     // Load registry: bundled fallback first, then cached live wins (stale-first)
     const registryPath = resolveBundledRegistryPath(this.extensionRoot);
@@ -106,6 +117,8 @@ export class Controller {
 
     const storedEci = this.context.globalState.get<unknown>(ECI_STATE_KEY);
     if (isEciDoc(storedEci)) this.eciDoc = storedEci;
+    const storedPerf = this.context.globalState.get<unknown>(PERF_STATE_KEY);
+    if (isPerfMetricsDoc(storedPerf)) this.perfDoc = storedPerf;
 
     // stale-first render
     const cached = await this.cache.load();
@@ -171,8 +184,9 @@ export class Controller {
     const bundledPath = resolveBundledScoresPath(this.extensionRoot);
     const overridePath = vscode.workspace.getConfiguration("neuraldash").get<string>("scoresOverridePath", "");
     const table = mergedScores(bundledPath, overridePath, eciScoreTable(snapshot.quotes, this.eciDoc));
-    const valued = rankQuotes(snapshot.quotes, table, tariff, preferred);
-    const best = bestValueSlug(valued);
+    const sortOrder = this.tree.getSortOrder();
+    const valued = rankQuotes(snapshot.quotes, table, tariff, preferred, this.perfDoc);
+    const best = topRankedSlug(valued, sortOrder);
 
     // Board display names: re-attach the publisher's proper label (the board
     // page serves raw ids) by joining the three already-fetched flex docs.
@@ -189,9 +203,17 @@ export class Controller {
       ? buildFlexCatalog(this.flexV1DocCache, this.flexPerfDocCache, this.flexCardsDocCache, this.registryCache, new Set(snapshot.quotes.map((q) => q.slug)))
       : [];
 
-    this.tree.setData(snapshot, enriched, best, tariff, flexList, this.registrySource, this.flexSources(), thinking);
+    this.tree.setData(snapshot, enriched, best, tariff, flexList, this.registrySource, this.flexSources(), thinking, this.perfDoc);
+    this.treeView.title = SORT_TITLES[sortOrder];
     const myModel = vscode.workspace.getConfiguration("neuraldash").get<string>("myModel", "");
-    this.statusBar.update(myModel, enriched);
+    this.statusBar.update(myModel, enriched, sortOrder);
+  }
+
+  refreshStatusBar(): void {
+    const order = this.tree.getSortOrder();
+    this.treeView.title = SORT_TITLES[order];
+    const myModel = vscode.workspace.getConfiguration("neuraldash").get<string>("myModel", "");
+    this.statusBar.update(myModel, this.tree.getBoardData().valued, order);
   }
 
   /**
@@ -412,8 +434,15 @@ export class Controller {
         }
       }
 
-      const perfResult = await this.flexProvider.fetchPerformanceView(stored.perf.contentHash);
+      const perfResult = await this.flexProvider.fetchPerformanceView(this.perfDoc ? stored.perf.contentHash : null);
       if (perfResult.status === "ok") {
+        try {
+          this.perfDoc = parsePerfMetrics(perfResult.html);
+          await this.context.globalState.update(PERF_STATE_KEY, this.perfDoc);
+          changed = true;
+        } catch {
+          // keep last-known perfDoc on malformed shape
+        }
         const parsed = parseFlexPerfView(perfResult.html);
         if (parsed) {
           this.flexPerfDocCache = parsed;

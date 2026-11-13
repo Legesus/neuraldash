@@ -209,7 +209,7 @@ describe("cardFormat — tierComparisonTable", () => {
     ]);
     assert.deepEqual(lines, [
       "| /1M tok | Normal | → Flex | Saving |",
-      "|---|---:|---:|---:|",
+      "|:---|---:|---:|---:|",
       "| Input | $2.00 | $1.30 | **−35%** |",
       "| Output | $8.00 | — | — |",
     ]);

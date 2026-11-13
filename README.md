@@ -8,14 +8,15 @@ Live NeuralWatt **energy-per-request** board inside VS Code. Shows `Right now` a
 
 ## Features
 
-- Tree view `NeuralWatt` → `Energy Board` lists all models with energy and cost per 1k requests. Energy is shown in μWh, mWh or Wh to fit the value. Models the board publishes no energy for sit in a collapsed `No energy data` section.
-- **48h trend chart** — right-click a model row (or use the tooltip link) to open a chart panel rendering the full 48-hour trendline with reference line and trend coloring.
-- Rich, sticky tooltips: full per-band table, colored 48h trend summary, cache hit %, benchmark value, plus `Copy Slug` and `Open Pricing Page` actions.
+- Tree view `NeuralWatt` → `Energy Board` lists all models with mode-aware metrics (Bang for Buck, Fastest, Lowest Price). Energy is shown in μWh, mWh or Wh to fit the value. Models the board publishes no energy for sit in a collapsed `No energy data` section.
+- **Performance metrics** — parses live first-token latency (TTFT p50/p95 with fast/mid/slow dot), throughput (p50/p95 tok/s), 7d cache hit %, and Flex dispatch wait from `https://portal.neuralwatt.com/energy-pricing?view=performance`.
+- **48h trend view** — click any model or Flex row (or use the tooltip link) to show the sidebar `48h Trend` Telemetry Bento with average-colored KPIs, 48-hour energy & throughput SVG charts with right-side indicator tags, and tracking-alias resolution (`alias → backend`).
+- Rich, sticky tooltips: compact per-band table, colored 48h trend summary, TTFT/throughput/cache hit %, benchmark value, plus `Copy Slug` and `Open Pricing Page` actions.
 - **Thinking line** on model and Flex tooltips, read from Neuralwatt's `/v1/models` catalog: whether the model thinks, whether it's always on, on by default or off by default, the default effort, and the effort levels it accepts (verbatim, ready for `reasoning_effort`). A lane with thinking off also shows what other lanes on the same weights do. Models the catalog doesn't list show no line.
-- Value ranking: `value = performanceScore / basisMwh` (basis from `preferredBand`).
-- Status bar — pins your chosen model (`neuraldash.myModel`) as `⚡ <name> · 245.48 mWh · $2.45/1k`.
-- Flex tiers — Neuralwatt's flex-tier models retrieved live from the catalog, each row labeled with its pricing provenance.
-- Polling with ETag / `If-None-Match`, 30s timeout, failure backoff (cap 120 min).
+- **3-mode sort** (`NeuralDash: Set Sort Order`): **Bang for Buck** (`throughput p50 ÷ energy`, default), **Fastest** (`throughput p50` desc, TTFT tiebreak), and **Lowest Price** (`energy` asc, cost tiebreak). Applies to both main models and Flex tiers.
+- Status bar — shows `neuraldash.myModel` when set, or pins the `#1` model under the active sort mode as `⚡ <name> · <p50> tok/s · <energy> (<mode>)`.
+- Flex tiers — Neuralwatt's flex-tier models retrieved live from the catalog, sorted by the active mode and inspectable in the `48h Trend` view at subsidized energy.
+- Polling with SHA-256 change detection, 30s timeout, failure backoff (cap 120 min).
 
 > **Note:** NeuralDash is unofficial and reads the public NeuralWatt energy-pricing page directly (energy pricing is HTML-only; the model catalog comes from Neuralwatt's public `/v1/models` API). If the page's structure changes, parsing may need an update — the board keeps serving its last cached data meanwhile.
 
@@ -51,7 +52,7 @@ Bundled and override scores take precedence over live ECI scores. `data/scores.j
 ## Commands
 
 - `NeuralDash: Refresh Board`
-- `Sort by Energy` / `Sort by Value` / `Sort by Name`
+- `NeuralDash: Set Sort Order` (`Bang for Buck` / `Fastest` / `Lowest Price`)
 - `Pick Best Value`
 - `Set My Model`
 - `Open 48h Trend Chart` (also via row right-click and the tooltip link)
