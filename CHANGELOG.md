@@ -2,6 +2,12 @@
 
 All notable changes to NeuralDash are documented here.
 
+## 0.7.1 — 2026-11-13
+
+README & registry presentation update:
+
+- **Redesigned README** — centered hero icon & title, Open VSX / GitHub Release / MIT badges, `[!NOTE]` unofficial callout, emoji feature summary, table of contents, installation instructions, and live sidebar/48h-trend preview screenshot (`docs/preview.png`).
+
 ## 0.7.0 — 2026-11-13
 
 Live throughput, TTFT, cache hit %, and 3-mode sorting on the Energy Board:

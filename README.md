@@ -1,10 +1,48 @@
-# NeuralDash — Energy Board
+<p align="center">
+  <img src="media/icon.png" alt="NeuralDash icon" width="128" height="128">
+</p>
 
-Live NeuralWatt **energy-per-request** board inside VS Code. Shows `Right now` and `7-day typical` energy, per-size breakdowns, 48-hour trend charts, and a value ranking (`performanceScore / mWh`) with status-bar pinning.
+<h1 align="center">NeuralDash — Energy Board</h1>
 
-> **Unofficial.** NeuralDash is an independent community extension and is not affiliated with or endorsed by Neuralwatt. It only reads Neuralwatt's public pricing pages and the public `/v1/models` catalog; it sends no data and needs no account or API key.
+<p align="center">
+  Live Neuralwatt <strong>energy-per-request</strong>, throughput, TTFT &amp; Flex pricing inside VS Code.
+</p>
 
-<!-- Preview screenshot lives at docs/prototype-48h-trend.png — re-enable this image once the project has a public repository URL (vsce resolves README images against it). -->
+<p align="center">
+  <a href="https://open-vsx.org/extension/Legesus/neuraldash"><img src="https://img.shields.io/open-vsx/v/Legesus/neuraldash?label=Open%20VSX&color=%2314b8a6" alt="Open VSX Version"></a>
+  <a href="https://open-vsx.org/extension/Legesus/neuraldash"><img src="https://img.shields.io/open-vsx/dt/Legesus/neuraldash?label=Downloads&color=blueviolet" alt="Open VSX Downloads"></a>
+  <a href="https://github.com/Legesus/neuraldash/releases"><img src="https://img.shields.io/github/v/release/Legesus/neuraldash?label=Release&color=blue" alt="GitHub Release"></a>
+  <a href="https://github.com/Legesus/neuraldash/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License"></a>
+</p>
+
+> [!NOTE]
+> **Unofficial.** NeuralDash is an independent community extension and is not affiliated with or endorsed by Neuralwatt. It reads only Neuralwatt's public pricing pages and the anonymous `/v1/models` catalog; it sends no data and needs no account or API key.
+
+- ⚡ **Live Energy & Perf Board** — `Right now` and `7d typical` energy (μWh / mWh / Wh), TTFT p50/p95, throughput tok/s, and 7d cache hit %.
+- 🔀 **3-Mode Sorting** — **Bang for Buck** (`throughput p50 ÷ energy`), **Fastest**, and **Lowest Price** across both main models and Flex tiers.
+- 📈 **48h Trend Telemetry Bento** — sidebar SVG charts for energy & throughput with average-colored KPIs, right-side indicator tags, and tracking-alias resolution (`alias → backend`).
+- 🧠 **Thinking Effort & Same-Weights Notes** — reasoning availability, default effort, and accepted `reasoning_effort` levels from `/v1/models`.
+- 🏷️ **Live Flex Tiers** — flex membership, subsidized energy, and pricing provenance enumerated at runtime with zero hardcoded data.
+
+---
+
+<p align="center">
+  <img src="https://github.com/Legesus/neuraldash/raw/main/docs/preview.png" alt="NeuralDash Energy Board and 48h Trend Telemetry Bento" width="560">
+</p>
+
+## Contents
+
+- [Installation](#installation)
+- [Features](#features)
+- [Configuration](#configuration)
+- [Scores](#scores)
+- [Commands](#commands)
+- [Flex tiers (live catalog)](#flex-tiers-live-catalog)
+- [Development](#development)
+
+## Installation
+
+Install NeuralDash from the [Open VSX Registry](https://open-vsx.org/extension/Legesus/neuraldash), or download the latest `.vsix` from [GitHub Releases](https://github.com/Legesus/neuraldash/releases) and install via **Extensions: Install from VSIX...**. Requires VS Code `1.85.0` or newer.
 
 ## Features
 
